@@ -1,0 +1,156 @@
+[
+  {
+    "id": "sop-01",
+    "category": "answerable",
+    "question": "What is the minimum equity injection for a start-up business under an SBA 7(a) loan?",
+    "reference_answer": "At least 10 percent of the total project costs (all costs required to become operational, regardless of the source of funds, except for lines of credit and 504 loans).",
+    "expected_source_doc": "sop_50_10_8_1.docx"
+  },
+  {
+    "id": "sop-02",
+    "category": "answerable",
+    "question": "What is the minimum equity injection for an Initial Acquisition change of ownership transaction, and can it be reduced?",
+    "reference_answer": "10 percent, and for Initial Acquisitions this requirement cannot be reduced or eliminated.",
+    "expected_source_doc": "sop_50_10_8_1.docx"
+  },
+  {
+    "id": "sop-03",
+    "category": "answerable",
+    "question": "Can the equity injection requirement be reduced or eliminated for a Business Expansion transaction?",
+    "reference_answer": "Yes, the Lender may reduce or eliminate the 10 percent equity requirement if it determines the Borrower has sufficient liquidity and working capital to sustain operations following the transaction.",
+    "expected_source_doc": "sop_50_10_8_1.docx"
+  },
+  {
+    "id": "sop-04",
+    "category": "answerable",
+    "question": "What form must a lender complete to document a loan disbursement on an SBA-guaranteed loan?",
+    "reference_answer": "SBA Form 1050, or the Lender's equivalent form, completed and signed at the time of first disbursement, with each subsequent disbursement documented and attached to the original.",
+    "expected_source_doc": "sop_50_10_8_1.docx"
+  },
+  {
+    "id": "sop-05",
+    "category": "answerable",
+    "question": "Can a lender require credit life insurance or whole life insurance as a condition of an SBA loan?",
+    "reference_answer": "No, credit life insurance or whole life insurance should not be required, though a lender may accept the pledge of an existing life insurance policy.",
+    "expected_source_doc": "sop_50_10_8_1.docx"
+  },
+  {
+    "id": "sop-06",
+    "category": "answerable",
+    "question": "Under what condition can a Standby Agreement count as equity injection?",
+    "reference_answer": "Only debt that is on full standby, meaning no payments of principal or interest for the term of the 7(a) loan, may be considered as equity, using SBA Form 155 or the Lender's equivalent Standby Agreement form.",
+    "expected_source_doc": "sop_50_10_8_1.docx"
+  },
+  {
+    "id": "sop-07",
+    "category": "answerable",
+    "question": "What are the requirements for a transaction to qualify as a Business Expansion change of ownership?",
+    "reference_answer": "An existing small business operating at least two full fiscal years under its current ownership must be purchasing 100 percent of another business in the same four-digit NAICS Industry Group, and the transaction must result in the same or a greater number of full personal guarantors as before.",
+    "expected_source_doc": "sop_50_10_8_1.docx"
+  },
+  {
+    "id": "sop-08",
+    "category": "answerable",
+    "question": "Do franchise agreements need to be reviewed as part of SBA loan underwriting?",
+    "reference_answer": "Yes, franchise, license, or similar management agreements must be reviewed to determine whether they give someone other than the Applicant sole discretion to manage the business's operations.",
+    "expected_source_doc": "sop_50_10_8_1.docx"
+  },
+  {
+    "id": "sop-09",
+    "category": "answerable",
+    "question": "What financial ratios must a lender analyze as part of financial due diligence for a change of ownership loan?",
+    "reference_answer": "Current Ratio, Debt/Tangible Net Worth, and Debt Service Coverage, along with any other ratios the Lender considers significant for the business or industry, such as inventory, receivables, and payables turnover.",
+    "expected_source_doc": "sop_50_10_8_1.docx"
+  },
+  {
+    "id": "cfr-01",
+    "category": "answerable",
+    "question": "How does SBA determine affiliation based on identity of interest?",
+    "reference_answer": "Affiliation may arise among two or more persons with an identity of interest, such as family members or individuals or firms with common investments, whose interests are treated as one party and aggregated, unless that presumption is successfully rebutted.",
+    "expected_source_doc": "cfr_121_affiliation.html"
+  },
+  {
+    "id": "cfr-02",
+    "category": "answerable",
+    "question": "How does SBA calculate a business's number of employees for size standard purposes?",
+    "reference_answer": "SBA counts all individuals employed on a full-time, part-time, or other basis, including employees obtained from a temporary employee agency, professional employer organization, or leasing concern.",
+    "expected_source_doc": "cfr_121_affiliation.html"
+  },
+  {
+    "id": "cfr-03",
+    "category": "answerable",
+    "question": "What is the newly organized concern rule for SBA affiliation?",
+    "reference_answer": "Affiliation may arise where former or current officers, directors, principal stockholders, managing members, or key employees of one concern organize a new concern in the same or a related industry and serve as its officers, directors, principal stockholders, managing members, or key employees.",
+    "expected_source_doc": "cfr_121_affiliation.html"
+  },
+  {
+    "id": "cfr-04",
+    "category": "answerable",
+    "question": "Does SBA consider stock options or agreements to merge when determining affiliation?",
+    "reference_answer": "Yes, SBA considers stock options, convertible securities, and agreements to merge (including agreements in principle) to have a present effect on the power to control a concern, treating them as though the rights granted have already been exercised.",
+    "expected_source_doc": "cfr_121_affiliation.html"
+  },
+  {
+    "id": "notice-01",
+    "category": "answerable",
+    "question": "What is the SBA upfront guaranty fee for a 7(a) loan of $150,000 or less with a maturity exceeding 12 months?",
+    "reference_answer": "2 percent of the guaranteed portion of the loan, and the Lender may retain no more than 25 percent of that fee, meaning at least 1.5 percent must be remitted to SBA.",
+    "expected_source_doc": "notice_7a_fees_fy2026.pdf"
+  },
+  {
+    "id": "notice-02",
+    "category": "answerable",
+    "question": "What is the SBA upfront guaranty fee for a 7(a) loan between $700,001 and $5,000,000?",
+    "reference_answer": "3.5 percent of the guaranteed portion up to and including $1,000,000, plus 3.75 percent of the guaranteed portion over $1,000,000.",
+    "expected_source_doc": "notice_7a_fees_fy2026.pdf"
+  },
+  {
+    "id": "notice-03",
+    "category": "answerable",
+    "question": "What is the FY 2026 SBA 7(a) Lender's Annual Service Fee?",
+    "reference_answer": "0.55 percent of the outstanding balance of the guaranteed portion of each loan, which lenders may not pass on to the borrower.",
+    "expected_source_doc": "notice_7a_fees_fy2026.pdf"
+  },
+  {
+    "id": "notice-04",
+    "category": "answerable",
+    "question": "Are manufacturers eligible for a reduced upfront fee on SBA 7(a) loans?",
+    "reference_answer": "Yes, loans to manufacturers in NAICS sectors 31-33 of $950,000 or less have a 0 percent upfront fee, though this does not apply to MARC loans.",
+    "expected_source_doc": "notice_7a_fees_fy2026.pdf"
+  },
+  {
+    "id": "notice-05",
+    "category": "answerable",
+    "question": "What is the upfront fee for a short-term 7(a) loan with a maturity of 12 months or less?",
+    "reference_answer": "0.25 percent of the guaranteed portion of the loan.",
+    "expected_source_doc": "notice_7a_fees_fy2026.pdf"
+  },
+  {
+    "id": "decline-01",
+    "category": "should_decline",
+    "question": "What is the interest rate cap on SBA 504 loans?",
+    "reference_answer": null,
+    "expected_source_doc": null
+  },
+  {
+    "id": "decline-02",
+    "category": "should_decline",
+    "question": "What is the capital of France?",
+    "reference_answer": null,
+    "expected_source_doc": null
+  },
+  {
+    "id": "decline-03",
+    "category": "should_decline",
+    "question": "What are the eligibility requirements for a USDA farm operating loan?",
+    "reference_answer": null,
+    "expected_source_doc": null
+  },
+  {
+    "id": "decline-04",
+    "category": "should_decline",
+    "question": "How do I file my personal income taxes?",
+    "reference_answer": null,
+    "expected_source_doc": null
+  }
+]

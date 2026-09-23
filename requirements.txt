@@ -19,3 +19,8 @@ pyyaml
 python-dotenv
 pytest
 httpx
+
+# Offline RAG quality evaluation (eval/test_golden_qa.py). aiobotocore is
+# required by deepeval's AmazonBedrockModel judge, not used elsewhere.
+deepeval
+aiobotocore
