@@ -10,6 +10,10 @@ class Citation(TypedDict):
 
 class QueryState(TypedDict, total=False):
     question: str
+    history: list[dict]
     retrieved_chunks: list[Citation]
+    top_rerank_score: float
+    gate_passed: bool
     answer: str
     citations: list[Citation]
+    grounded: bool
