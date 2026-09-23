@@ -1,4 +1,5 @@
 import logging
+import os
 import time
 
 import boto3
@@ -18,7 +19,11 @@ def rerank(question: str, candidates: list[dict], top_k: int, client=None) -> li
         return []
 
     start = time.perf_counter()
-    client = client if client is not None else boto3.client("bedrock-agent-runtime")
+    # boto3's own default region resolution only reads AWS_DEFAULT_REGION, not
+    # AWS_REGION -- which this project standardizes on everywhere else (see
+    # .env.example). Locally that gap is masked by ~/.aws/config having a
+    # default region; a clean CI runner has neither, so pass it explicitly.
+    client = client if client is not None else boto3.client("bedrock-agent-runtime", region_name=os.getenv("AWS_REGION"))
     model_arn = f"arn:aws:bedrock:{client.meta.region_name}::foundation-model/{RERANK_MODEL_ID}"
 
     response = client.rerank(
