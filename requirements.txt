@@ -1,0 +1,17 @@
+fastapi
+uvicorn[standard]
+streamlit
+requests
+pydantic
+langgraph
+langchain
+langchain-aws
+chromadb
+tiktoken
+python-docx
+pypdf
+beautifulsoup4
+lxml
+pyyaml
+pytest
+httpx

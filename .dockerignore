@@ -1,0 +1,13 @@
+.env
+.env.*
+!.env.example
+.git/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+data/
+chroma_db/
+docs/
+.superpowers/
