@@ -43,6 +43,42 @@ def test_retrieve_unions_vector_and_bm25_candidates_then_reranks():
     assert set(fetch_ids) == {"v1", "v2", "shared", "b1"}
 
 
+def test_retrieve_drops_reranked_candidates_below_the_relevance_floor():
+    # Regression test: reranking always fills up to TOP_K slots regardless of
+    # whether that many candidates are actually relevant, padding citations
+    # with topically-adjacent-but-irrelevant chunks. Anything scoring below
+    # the same floor grounding_gate uses should be dropped, not surfaced.
+    fake_collection = Mock()
+    fake_collection.query.return_value = {"ids": [["v1", "v2"]]}
+    fake_collection.get.return_value = {
+        "ids": ["v1", "v2"],
+        "documents": ["relevant doc", "irrelevant doc"],
+        "metadatas": [
+            {"source_doc": "a.docx", "effective_date": "2026-01-01", "program": "core"},
+            {"source_doc": "a.docx", "effective_date": "2026-01-01", "program": "core"},
+        ],
+    }
+    fake_embedder = Mock()
+    fake_embedder.embed_query.return_value = [0.1, 0.2]
+
+    def fake_rerank(question, candidates, top_k, client=None):
+        by_id = {c["chunk_id"]: c for c in candidates}
+        return [{**by_id["v1"], "score": 0.8}, {**by_id["v2"], "score": 0.05}][:top_k]
+
+    with (
+        patch("pipeline.retrieve.get_embedding_model", return_value=fake_embedder),
+        patch("pipeline.retrieve.rank_by_bm25", return_value=[]),
+        patch("pipeline.retrieve.rerank", side_effect=fake_rerank),
+    ):
+        result = retrieve({"question": "what is the equity requirement"}, collection=fake_collection)
+
+    assert len(result["retrieved_chunks"]) == 1
+    assert result["retrieved_chunks"][0]["chunk_text"] == "relevant doc"
+    # The gate still checks against the single best score, even though the
+    # low-scoring candidate was dropped from the citations shown to the user.
+    assert result["top_rerank_score"] == 0.8
+
+
 def test_retrieve_returns_empty_chunks_when_no_candidates_found():
     fake_collection = Mock()
     fake_collection.query.return_value = {"ids": [[]]}

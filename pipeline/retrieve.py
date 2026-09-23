@@ -4,6 +4,7 @@ import time
 from config.settings import get_embedding_model
 from ingestion.embed import get_chroma_collection
 from pipeline.bm25_index import rank_by_bm25
+from pipeline.grounding_gate import GROUNDING_GATE_THRESHOLD
 from pipeline.rerank import rerank
 from pipeline.state import Citation, QueryState
 
@@ -49,9 +50,16 @@ def retrieve(state: QueryState, collection=None) -> QueryState:
         # scoring against the folded text let follow-ups unrelated to the current
         # question inherit a high score from the *previous* turn's relevance,
         # causing grounding_gate to pass questions it should have declined.
-        top_candidates = rerank(question, candidates, top_k=TOP_K)
-        if top_candidates:
-            top_rerank_score = top_candidates[0]["score"]
+        reranked = rerank(question, candidates, top_k=TOP_K)
+        if reranked:
+            top_rerank_score = reranked[0]["score"]
+        # Reranking alone always fills up to TOP_K slots regardless of whether
+        # that many candidates are actually relevant -- padding the answer with
+        # topically-adjacent-but-irrelevant chunks (e.g. other sections of the
+        # same source document) that dilute both the generated answer's context
+        # and the citations shown to the user. Drop anything below the same
+        # floor grounding_gate already treats as "not meaningfully relevant".
+        top_candidates = [c for c in reranked if c["score"] >= GROUNDING_GATE_THRESHOLD]
         retrieved = [
             Citation(
                 source_doc=c["metadata"]["source_doc"],
