@@ -4,10 +4,16 @@ import chromadb
 
 from ingestion.chunker import Chunk
 from ingestion.embed import upsert_chunks
+from pipeline.bm25_index import invalidate_bm25_index
 from pipeline.retrieve import retrieve
 
 
+def _passthrough_rerank(question, candidates, top_k, client=None):
+    return [{**c, "score": 1.0} for c in candidates[:top_k]]
+
+
 def test_retrieve_round_trips_metadata_written_by_upsert_chunks():
+    invalidate_bm25_index()
     collection = chromadb.EphemeralClient().get_or_create_collection("integration-test")
     chunks = [
         Chunk(
@@ -26,7 +32,10 @@ def test_retrieve_round_trips_metadata_written_by_upsert_chunks():
     with patch("ingestion.embed.get_embedding_model", return_value=fake_embedder):
         upsert_chunks(chunks, collection=collection)
 
-    with patch("pipeline.retrieve.get_embedding_model", return_value=fake_embedder):
+    with (
+        patch("pipeline.retrieve.get_embedding_model", return_value=fake_embedder),
+        patch("pipeline.retrieve.rerank", side_effect=_passthrough_rerank),
+    ):
         result = retrieve({"question": "equity injection"}, collection=collection)
 
     assert len(result["retrieved_chunks"]) == 1

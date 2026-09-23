@@ -4,6 +4,7 @@ from ingestion.chunker import chunk_document
 from ingestion.embed import delete_chunks_for_source, upsert_chunks
 from ingestion.loader import load_document
 from ingestion.manifest import CORPUS_MANIFEST
+from pipeline.bm25_index import invalidate_bm25_index
 
 RAW_DIR = Path("data/raw")
 
@@ -15,4 +16,5 @@ def run_ingestion(raw_dir: Path = RAW_DIR) -> int:
         chunks = chunk_document(document)
         delete_chunks_for_source(entry.filename)
         total += upsert_chunks(chunks)
+    invalidate_bm25_index()
     return total

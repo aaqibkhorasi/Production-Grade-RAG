@@ -6,12 +6,16 @@ pydantic
 langgraph
 langchain
 langchain-aws
+langchain-ollama
+langchain-openai
 chromadb
+rank-bm25
 tiktoken
 python-docx
 pypdf
 beautifulsoup4
 lxml
 pyyaml
+python-dotenv
 pytest
 httpx
