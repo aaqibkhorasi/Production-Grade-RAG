@@ -1,8 +1,14 @@
 from pydantic import BaseModel
 
 
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+
 class QueryRequest(BaseModel):
     question: str
+    history: list[ChatMessage] = []
 
 
 class CitationResponse(BaseModel):
@@ -15,6 +21,7 @@ class CitationResponse(BaseModel):
 class QueryResponse(BaseModel):
     answer: str
     citations: list[CitationResponse]
+    grounded: bool
 
 
 class IngestResponse(BaseModel):
