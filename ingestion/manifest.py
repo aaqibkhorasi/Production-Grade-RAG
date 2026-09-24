@@ -8,6 +8,12 @@ class ManifestEntry:
     file_type: str  # "docx" | "pdf" | "html"
     effective_date: str  # ISO 8601 date
     program: str  # "core" | "7(a)" | "504" | "affiliation"
+    # Floor for extracted text length, set well below what each source actually
+    # yields. A fetch that returns a bot-check page or a parse that stops
+    # recognising the markup still "succeeds" and produces a few junk chunks,
+    # which only shows up much later as that document never being retrievable.
+    # Failing ingestion loudly here is far cheaper to diagnose.
+    min_chars: int = 0
 
 
 CORPUS_MANIFEST: list[ManifestEntry] = [
@@ -20,6 +26,7 @@ CORPUS_MANIFEST: list[ManifestEntry] = [
         file_type="docx",
         effective_date="2026-10-01",
         program="core",
+        min_chars=100_000,
     ),
     ManifestEntry(
         filename="cfr_121_affiliation.html",
@@ -27,6 +34,7 @@ CORPUS_MANIFEST: list[ManifestEntry] = [
         file_type="html",
         effective_date="2026-09-22",
         program="affiliation",
+        min_chars=50_000,
     ),
     ManifestEntry(
         filename="notice_7a_fees_fy2026.pdf",
@@ -37,5 +45,6 @@ CORPUS_MANIFEST: list[ManifestEntry] = [
         file_type="pdf",
         effective_date="2025-08-28",
         program="7(a)",
+        min_chars=5_000,
     ),
 ]

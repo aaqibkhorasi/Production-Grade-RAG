@@ -29,7 +29,12 @@ jobs:
       - name: Download corpus and build the vector store
         run: |
           python -m ingestion.download_corpus
-          python -c "from ingestion.orchestrator import run_ingestion; run_ingestion()"
+          python -c "
+          import logging
+          logging.basicConfig(level=logging.INFO, format='%(name)s %(levelname)s %(message)s')
+          from ingestion.orchestrator import run_ingestion
+          run_ingestion()
+          "
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}

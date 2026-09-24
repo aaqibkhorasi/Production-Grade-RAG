@@ -71,3 +71,46 @@ def test_load_document_raises_on_empty_text(tmp_path):
     except ValueError:
         raised = True
     assert raised
+
+
+def test_load_document_raises_when_extraction_falls_below_min_chars(tmp_path):
+    # A bot-check page or JS shell parses fine and yields a little text, so the
+    # empty-text check alone would let it through and silently poison retrieval.
+    (tmp_path / "blocked.html").write_text(
+        "<html><body><p>Please enable JavaScript to view this page.</p></body></html>",
+        encoding="utf-8",
+    )
+    entry = ManifestEntry(
+        filename="blocked.html", url="https://example.com/cfr.html",
+        file_type="html", effective_date="2026-01-01", program="affiliation",
+        min_chars=50_000,
+    )
+
+    try:
+        load_document(entry, tmp_path)
+        raised = False
+    except ValueError as exc:
+        raised = "expected at least 50000" in str(exc)
+    assert raised
+
+
+def test_load_html_prefers_the_main_content_container(tmp_path):
+    # eCFR wraps the regulation in div.part; the surrounding page is nav and
+    # browser-support banners that chunk into near-duplicate noise.
+    (tmp_path / "cfr.html").write_text(
+        "<html><body>"
+        "<div class='banner'>You are using an unsupported browser</div>"
+        "<div class='part'>stub</div>"
+        "<div class='part'>Affiliation is based on control over the concern.</div>"
+        "</body></html>",
+        encoding="utf-8",
+    )
+    entry = ManifestEntry(
+        filename="cfr.html", url="https://example.com/cfr.html",
+        file_type="html", effective_date="2026-01-01", program="affiliation",
+    )
+
+    result = load_document(entry, tmp_path)
+
+    assert "Affiliation is based on control" in result.text
+    assert "unsupported browser" not in result.text
