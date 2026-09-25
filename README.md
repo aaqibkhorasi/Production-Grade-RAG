@@ -226,15 +226,17 @@ They are non-blocking on purpose. During development the judge was measurably th
 
 A `NonAdvice` metric was tried and removed: in a regulatory-explainer domain it scored 0.0 on accurate restatements of SBA policy, which is exactly what the system is supposed to produce.
 
-**What the tracked metrics currently say.** Moving from uniform 800-token windows to provision-aware chunking produced this, measured over the same 18 answerable cases:
+**What the tracked metrics currently say.** Moving from uniform 800-token windows to provision-aware chunking produced this, over the same 18 answerable cases:
 
 | Metric | Uniform 800-token windows | Provision-aware chunks |
 | --- | --- | --- |
-| Faithfulness | 14 cases below threshold | **8** |
-| Contextual Precision | 1 case below threshold | **0** |
-| Contextual Relevancy | 11 cases below threshold | **12** |
+| Faithfulness | 14 cases below threshold | **8–10** |
+| Contextual Precision | 1 case below threshold | **0** (mean 0.97) |
+| Contextual Relevancy | 11 cases below threshold | **10–12** |
 
-Faithfulness and Precision improved clearly. Contextual Relevancy did not — which is worth stating plainly, because it was the metric the change was aimed at.
+The ranges are not hedging. Running the suite twice against identical code and an identical index gave Faithfulness 8 then 10, and Relevancy 12 then 10 — the judge has a run-to-run spread of roughly ±2 cases, so any difference smaller than that is noise. Worth knowing before reading anything into a single run.
+
+Against that noise floor: Faithfulness improved by more than the spread, so the gain is real. Precision cleared entirely. **Contextual Relevancy did not move** — which is worth stating plainly, because it was the metric the change was aimed at.
 
 The likely reason is that Relevancy measures the *proportion* of retrieved statements that bear on the question, and retrieval still returns a fixed `TOP_K = 5` regardless of how many chunks actually help. Smaller, cleaner chunks make each one more focused but do not change the ratio when four of the five are adjacent provisions. The lever for that is adaptive `TOP_K` or a higher per-chunk relevance floor, not chunk boundaries — see [Known limitations](#known-limitations).
 
@@ -248,6 +250,8 @@ The likely reason is that Relevancy measures the *proportion* of retrieved state
 The eval job needs three repository secrets (**Settings → Secrets and variables → Actions**): `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_REGION`. Repository secrets are encrypted, kept out of git history, and masked in logs — unlike a committed `.env`, which is why credentials live there and not in the repo.
 
 Note that CI rebuilds the index from scratch on every run and makes real Bedrock calls, so each run takes about 10 minutes and costs real money.
+
+**Reading the results.** The eval job writes a table to the GitHub Actions **job summary**, so every case's tracked-metric scores render on the run page — no expanding steps or scrolling the log. Scores below threshold are flagged, judge errors are listed separately, and the footer gives the count below threshold and the mean per metric. The same table prints to the terminal after a local `pytest eval/`.
 
 ## Known limitations
 
