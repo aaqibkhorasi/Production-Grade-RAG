@@ -1,3 +1,5 @@
+import re
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -9,21 +11,115 @@ from ingestion.manifest import ManifestEntry
 
 
 @dataclass(frozen=True)
+class Section:
+    """A run of body text under one heading, with the full heading path above it.
+
+    Chunking works on these rather than on the flat text so a chunk boundary
+    lands between provisions instead of in the middle of one.
+    """
+
+    heading_path: tuple[str, ...]
+    text: str
+
+
+@dataclass(frozen=True)
 class Document:
     text: str
     source_doc: str
     effective_date: str
     program: str
+    # Empty when a source exposes no headings at all; the chunker then falls
+    # back to treating the whole document as one unlabelled section.
+    sections: tuple[Section, ...] = ()
 
 
-def _load_docx(path: Path) -> str:
+_DOCX_HEADING_STYLE = re.compile(r"Heading (\d)")
+
+
+def _load_docx(path: Path) -> tuple[str, list[tuple[str, int]]]:
     document = docx.Document(str(path))
-    return "\n".join(p.text for p in document.paragraphs if p.text.strip())
+    lines: list[str] = []
+    headings: list[tuple[str, int]] = []
+    for paragraph in document.paragraphs:
+        text = paragraph.text.strip()
+        if not text:
+            continue
+        style = paragraph.style.name
+        # The table of contents repeats every heading in the book alongside a
+        # page number, which retrieves as a near-duplicate of the real section.
+        if style.lower().startswith("toc"):
+            continue
+        lines.append(text)
+        # Only an exact "Heading N" is a heading -- the SOP also uses styles like
+        # "Heading 4 para under" for the body paragraph that follows one.
+        match = _DOCX_HEADING_STYLE.fullmatch(style)
+        if match:
+            headings.append((text, int(match.group(1))))
+    return "\n".join(lines), headings
 
 
-def _load_pdf(path: Path) -> str:
+_PAGE_NUMBER_LINE = re.compile(r"^page\s+\d+\s+of\s+\d+", re.IGNORECASE)
+# How many lines at each edge of a page can be a running header or footer.
+_PAGE_MARGIN_LINES = 3
+
+
+def _strip_page_furniture(pages: list[list[str]]) -> list[str]:
+    """Drop running headers and footers.
+
+    They repeat on every page, so in the concatenated text they land in the
+    middle of provisions and chunk into noise. Furniture is identified by
+    position as well as by repetition: repetition alone would also match a
+    definition or caveat that the document legitimately restates on several
+    pages, so only lines sitting in a page's top or bottom margin qualify.
+    """
+    if len(pages) < 2:
+        return [line for page in pages for line in page if line]
+
+    margin_appearances: Counter[str] = Counter()
+    for page in pages:
+        margin = set(page[:_PAGE_MARGIN_LINES] + page[-_PAGE_MARGIN_LINES:])
+        margin_appearances.update(line for line in margin if line)
+
+    threshold = max(2, len(pages) // 2)
+    furniture = {line for line, count in margin_appearances.items() if count >= threshold}
+
+    return [
+        line
+        for page in pages
+        for line in page
+        if line and line not in furniture and not _PAGE_NUMBER_LINE.match(line)
+    ]
+
+
+def _looks_like_heading(line: str) -> bool:
+    """Heuristic heading test for PDFs, which carry no structural markup."""
+    if not line or len(line) > 100:
+        return False
+    # "Upfront Fee for EWCP loans:" -- a trailing colon introduces a provision.
+    if line.endswith(":"):
+        return True
+    # "Additional Upfront Fee for 7(a) Loan Increases" -- a short, mostly
+    # capitalised line that is not a sentence.
+    if len(line) > 80 or line.endswith((".", ";", ",")):
+        return False
+    words = re.findall(r"[A-Za-z]+", line)
+    if not words:
+        return False
+    return sum(word[0].isupper() for word in words) / len(words) >= 0.5
+
+
+def _load_pdf(path: Path) -> tuple[str, list[tuple[str, int]]]:
     reader = PdfReader(str(path))
-    return "\n".join(page.extract_text() or "" for page in reader.pages)
+    # Kept page by page: _strip_page_furniture needs to know where on a page a
+    # line sat, which is lost once the pages are concatenated.
+    pages = [
+        [line.strip() for line in (page.extract_text() or "").split("\n")]
+        for page in reader.pages
+    ]
+    lines = _strip_page_furniture(pages)
+    # A PDF has no heading levels to read, so every detected heading is a peer.
+    headings = [(line, 1) for line in lines if _looks_like_heading(line)]
+    return "\n".join(lines), headings
 
 
 # Content containers to prefer, most specific first. eCFR wraps the actual
@@ -31,17 +127,56 @@ def _load_pdf(path: Path) -> str:
 # nav, cookie banners and "unsupported browser" notices, which chunk into dozens
 # of near-duplicate fragments that dilute retrieval.
 _HTML_CONTENT_SELECTORS = ("div.part", "main", "article", "#content")
+_HTML_HEADING_TAGS = ("h1", "h2", "h3", "h4", "h5", "h6")
 
 
-def _load_html(path: Path) -> str:
+def _load_html(path: Path) -> tuple[str, list[tuple[str, int]]]:
     soup = BeautifulSoup(path.read_text(encoding="utf-8"), "html.parser")
+    container = soup
     for selector in _HTML_CONTENT_SELECTORS:
         matches = soup.select(selector)
         if matches:
             # A page can repeat a selector for small fragments (eCFR has a stub
             # div.part alongside the real one); the real content is the largest.
-            return max(matches, key=lambda m: len(m.get_text())).get_text(separator="\n")
-    return soup.get_text(separator="\n")
+            container = max(matches, key=lambda m: len(m.get_text()))
+            break
+    headings = [
+        (heading.get_text(separator="\n").strip(), int(tag[1]))
+        for heading in container.find_all(_HTML_HEADING_TAGS)
+        for tag in [heading.name]
+        if heading.get_text(strip=True)
+    ]
+    return container.get_text(separator="\n"), headings
+
+
+def _build_sections(text: str, headings: list[tuple[str, int]]) -> tuple[Section, ...]:
+    """Split the flat text at each heading, tracking the enclosing heading path.
+
+    Headings are located by scanning forward, never by searching the whole
+    string, so a heading whose wording repeats later in the document still
+    anchors to its own occurrence.
+    """
+    spans: list[tuple[int, str, int]] = []
+    cursor = 0
+    for heading, level in headings:
+        index = text.find(heading, cursor)
+        if index == -1:
+            continue
+        spans.append((index, heading, level))
+        cursor = index + len(heading)
+
+    sections: list[Section] = []
+    open_headings: dict[int, str] = {}
+    for position, (index, heading, level) in enumerate(spans):
+        end = spans[position + 1][0] if position + 1 < len(spans) else len(text)
+        # A heading closes every deeper one still open above it.
+        open_headings = {lvl: h for lvl, h in open_headings.items() if lvl < level}
+        open_headings[level] = heading
+        body = text[index + len(heading) : end].strip()
+        if body:
+            path = tuple(open_headings[lvl] for lvl in sorted(open_headings))
+            sections.append(Section(heading_path=path, text=body))
+    return tuple(sections)
 
 
 _LOADERS = {"docx": _load_docx, "pdf": _load_pdf, "html": _load_html}
@@ -49,7 +184,7 @@ _LOADERS = {"docx": _load_docx, "pdf": _load_pdf, "html": _load_html}
 
 def load_document(entry: ManifestEntry, raw_dir: Path) -> Document:
     path = raw_dir / entry.filename
-    text = _LOADERS[entry.file_type](path)
+    text, headings = _LOADERS[entry.file_type](path)
     extracted = len(text.strip())
     if not extracted:
         raise ValueError(f"No text extracted from {path}")
@@ -63,4 +198,5 @@ def load_document(entry: ManifestEntry, raw_dir: Path) -> Document:
         source_doc=entry.filename,
         effective_date=entry.effective_date,
         program=entry.program,
+        sections=_build_sections(text, headings),
     )
