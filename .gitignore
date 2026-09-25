@@ -24,6 +24,9 @@ env/
 
 # Test / lint / type-check caches
 .pytest_cache/
+.deepeval/
+.deepeval-cache.json
+.deepeval_telemetry.txt
 .mypy_cache/
 .ruff_cache/
 .coverage
