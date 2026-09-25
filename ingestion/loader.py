@@ -91,6 +91,52 @@ def _strip_page_furniture(pages: list[list[str]]) -> list[str]:
     ]
 
 
+_LIST_MARKERS = ("•", "◦", "-", "*", "–")
+
+
+# A provision heading is a phrase; "TO:", "SUBJECT:" and "CONTROL NO.:" are
+# document metadata and splitting them only yields a stub chunk.
+_MIN_INLINE_HEADING_WORDS = 4
+
+
+def _split_inline_headings(lines: list[str]) -> list[tuple[str, bool]]:
+    """Break "Heading: first words of the body" into two lines.
+
+    A PDF wraps text at a fixed width, so a heading short enough to leave room
+    on its line runs on into its own body and is no longer a line ending in a
+    colon. The provision then gets filed under the previous heading: in the fee
+    notice the short-term fee rule lands under "For loans with a maturity that
+    exceeds 12 months", labelling the chunk with the opposite of what it answers.
+
+    List markers are excluded because a bullet such as "For loans of $150,000
+    or less: 2% ..." is one row of a fee table, and promoting each row to a
+    heading would break the table into unreadable fragments.
+
+    Returns each line with whether it may still be considered for heading
+    detection. The tail of a split is body text, and has to be marked: it
+    begins mid-sentence on a capitalised word, so "The Annual Service Fee is
+    set for" would otherwise read as a heading in its own right.
+    """
+    out: list[tuple[str, bool]] = []
+    for line in lines:
+        head, separator, rest = line.partition(": ")
+        if (
+            separator
+            and rest.strip()
+            and not line.startswith(_LIST_MARKERS)
+            and len(head) <= 100
+            and len(re.findall(r"\S+", head)) >= _MIN_INLINE_HEADING_WORDS
+            # ". " means the prefix spans a sentence boundary, so this is prose
+            # that happens to contain a colon rather than a heading.
+            and ". " not in head
+        ):
+            out.append((f"{head}:", True))
+            out.append((rest.strip(), False))
+            continue
+        out.append((line, True))
+    return out
+
+
 def _looks_like_heading(line: str) -> bool:
     """Heuristic heading test for PDFs, which carry no structural markup."""
     if not line or len(line) > 100:
@@ -116,10 +162,12 @@ def _load_pdf(path: Path) -> tuple[str, list[tuple[str, int]]]:
         [line.strip() for line in (page.extract_text() or "").split("\n")]
         for page in reader.pages
     ]
-    lines = _strip_page_furniture(pages)
+    marked = _split_inline_headings(_strip_page_furniture(pages))
     # A PDF has no heading levels to read, so every detected heading is a peer.
-    headings = [(line, 1) for line in lines if _looks_like_heading(line)]
-    return "\n".join(lines), headings
+    headings = [
+        (line, 1) for line, may_be_heading in marked if may_be_heading and _looks_like_heading(line)
+    ]
+    return "\n".join(line for line, _ in marked), headings
 
 
 # Content containers to prefer, most specific first. eCFR wraps the actual

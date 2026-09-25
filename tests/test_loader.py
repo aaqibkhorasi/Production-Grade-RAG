@@ -235,3 +235,68 @@ def entry_for_pdf() -> ManifestEntry:
         filename="notice.pdf", url="https://example.com/notice.pdf",
         file_type="pdf", effective_date="2025-08-28", program="7(a)",
     )
+
+
+def _pdf_sections(tmp_path, page_text):
+    (tmp_path / "notice.pdf").write_bytes(b"%PDF-fake")
+    page = Mock()
+    page.extract_text.return_value = page_text
+    with patch("ingestion.loader.PdfReader", return_value=Mock(pages=[page])):
+        return load_document(entry_for_pdf(), tmp_path).sections
+
+
+def test_load_pdf_splits_a_heading_that_wraps_into_its_own_body(tmp_path):
+    # A PDF wraps at a fixed width, so a short heading runs on into its body and
+    # stops being a line ending in a colon. Left alone, the short-term fee rule
+    # is filed under "exceeds 12 months" -- the opposite of what it answers.
+    sections = _pdf_sections(tmp_path, (
+        "For loans with a maturity that exceeds 12 months, the Upfront Fees are:\n"
+        "Two percent of the guaranteed portion of the loan.\n"
+        "For loans with a maturity of 12 months or less (Short-term loans): 0.25% of\n"
+        "the guaranteed portion of the loan.\n"
+    ))
+
+    paths = [p for s in sections for p in s.heading_path]
+    assert "For loans with a maturity of 12 months or less (Short-term loans):" in paths
+    short_term = [s for s in sections if "12 months or less" in s.heading_path[0]][0]
+    assert "0.25%" in short_term.text
+
+
+def test_load_pdf_does_not_treat_the_tail_of_a_split_as_a_heading(tmp_path):
+    # The tail begins mid-sentence on a capitalised word, so it would otherwise
+    # satisfy the "short, mostly capitalised" heading test on its own.
+    sections = _pdf_sections(tmp_path, (
+        "Annual Service Fee for multiple 7(a) loans within 90 days: The Annual Service Fee\n"
+        "is set for each loan on a standalone basis.\n"
+    ))
+
+    paths = [p for s in sections for p in s.heading_path]
+    assert "Annual Service Fee for multiple 7(a) loans within 90 days:" in paths
+    assert "The Annual Service Fee" not in paths
+
+
+def test_load_pdf_does_not_split_fee_table_rows(tmp_path):
+    # Each bullet is one row of a fee table; promoting rows to headings would
+    # break the table into fragments that no longer read as a schedule.
+    sections = _pdf_sections(tmp_path, (
+        "For loans with a maturity that exceeds 12 months, the Upfront Fees are:\n"
+        "• For loans of $150,000 or less: 2% of the guaranteed portion.\n"
+        "• For loans of $150,001 to $700,000: 3% of the guaranteed portion.\n"
+    ))
+
+    assert len(sections) == 1
+    assert "$150,000 or less: 2%" in sections[0].text
+    assert "$150,001 to $700,000: 3%" in sections[0].text
+
+
+def test_load_pdf_does_not_split_short_metadata_headers(tmp_path):
+    # "CONTROL NO.: 5000-872051" is metadata, not a provision; splitting it
+    # only produces a stub chunk.
+    sections = _pdf_sections(tmp_path, (
+        "CONTROL NO.: 5000-872051\n"
+        "EFFECTIVE: August 28, 2025\n"
+        "Each year SBA reviews certain fees payable by 7(a) Lenders.\n"
+    ))
+
+    paths = [p for s in sections for p in s.heading_path]
+    assert "CONTROL NO.:" not in paths
