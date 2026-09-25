@@ -30,6 +30,13 @@ grounding_check:
     question, respond NOT_GROUNDED as well -- there is nothing in it to
     treat as a supported, citable answer, even though it contains no false
     claims.
+
+    This applies to a partial decline too. A draft answer that says it
+    cannot find what was asked and then offers related material it did
+    find -- facts about a neighbouring program, or what the context covers
+    instead -- has still not answered the question. Judge the draft against
+    the question that was asked, not against the facts it happens to state,
+    and respond NOT_GROUNDED.
   human_template: |
     Source context:
     {context}
