@@ -59,7 +59,19 @@ question ─▶ retrieve ─▶ grounding_gate ─▶ generate ─▶ grounding_
 | Tests | `tests/` | Unit and contract tests, fully mocked (no network) |
 | Eval | `eval/` | DeepEval golden set suite |
 
-Chunking is 800 tokens maximum with 100 tokens of overlap, measured with `tiktoken`'s `cl100k_base` encoding.
+### Chunking
+
+Chunks follow the document's own structure rather than a fixed token window. Each source exposes its headings differently, so the loader reads whichever signal is authoritative and the chunker works on the resulting sections:
+
+| Source | Heading signal |
+| --- | --- |
+| SOP 50 10 (`.docx`) | Word paragraph styles (`Heading 1`–`Heading 5`); the table of contents is skipped |
+| 13 CFR 121 (`.html`) | `<h1>`–`<h6>` tags inside the regulation container |
+| Fee notice (`.pdf`) | No markup, so headings are detected heuristically and repeated page headers/footers are stripped |
+
+Sections are then packed to a ~450-token target under an 800-token ceiling, splitting only on line boundaries so a cut never lands mid-provision. Small adjacent sections pack together instead of becoming tiny low-signal chunks; a section over the target is split across its own provisions.
+
+Every chunk is prefixed with its heading path (`Section A > Chapter 4: Fees > Upfront Fee for EWCP loans`). That prefix rides in the chunk text rather than in metadata, so it reaches the embedding, the BM25 index, the generator's context and the citation shown to the user. Without it a chunk about EWCP fees may never contain the word "EWCP".
 
 Both diagrams are editable — the `.drawio` sources live alongside the exports in [docs/diagrams/](docs/diagrams/) and open in [diagrams.net](https://app.diagrams.net) or the draw.io desktop app. The architecture diagram animates the query path when opened in the editor.
 
@@ -214,7 +226,17 @@ They are non-blocking on purpose. During development the judge was measurably th
 
 A `NonAdvice` metric was tried and removed: in a regulatory-explainer domain it scored 0.0 on accurate restatements of SBA policy, which is exactly what the system is supposed to produce.
 
-**What the tracked metrics currently say:** most answerable cases score below 0.7 on Contextual Relevancy, and the reasons are consistent — the correct passage is retrieved every time, but arrives surrounded by adjacent provisions from the same 800-token window. That is a known limitation, and chunking on provision boundaries instead of fixed token counts is the logical next step.
+**What the tracked metrics currently say.** Moving from uniform 800-token windows to provision-aware chunking produced this, measured over the same 18 answerable cases:
+
+| Metric | Uniform 800-token windows | Provision-aware chunks |
+| --- | --- | --- |
+| Faithfulness | 14 cases below threshold | **8** |
+| Contextual Precision | 1 case below threshold | **0** |
+| Contextual Relevancy | 11 cases below threshold | **12** |
+
+Faithfulness and Precision improved clearly. Contextual Relevancy did not — which is worth stating plainly, because it was the metric the change was aimed at.
+
+The likely reason is that Relevancy measures the *proportion* of retrieved statements that bear on the question, and retrieval still returns a fixed `TOP_K = 5` regardless of how many chunks actually help. Smaller, cleaner chunks make each one more focused but do not change the ratio when four of the five are adjacent provisions. The lever for that is adaptive `TOP_K` or a higher per-chunk relevance floor, not chunk boundaries — see [Known limitations](#known-limitations).
 
 ## CI
 
@@ -229,7 +251,8 @@ Note that CI rebuilds the index from scratch on every run and makes real Bedrock
 
 ## Known limitations
 
-- **Fixed-window chunking** splits on token counts, not on provision or fee-tier boundaries. This is the root of the Contextual Relevancy scores above.
-- **The grounding gate threshold is not empirically calibrated.** It is a conservative starting value chosen from observed rerank score distributions, not tuned against labelled data.
+- **Retrieval always returns `TOP_K = 5` chunks**, however many actually bear on the question, so the context is padded with adjacent provisions. This is the remaining cause of the Contextual Relevancy scores above; adaptive `TOP_K` or a higher relevance floor is the fix.
+- **The grounding gate threshold is not empirically calibrated.** It is a conservative starting value chosen from observed rerank score distributions, not tuned against labelled data. The same value doubles as the per-chunk relevance floor, where `0.2` is permissive.
+- **PDF heading detection is heuristic.** A PDF carries no structural markup, so headings are inferred from line length, capitalisation and a trailing colon. It works on the fee notice; a differently formatted notice may need the rules revisited.
 - **The BM25 index is per-process and in-memory.** It rebuilds on first use after ingestion invalidates it, which does not survive horizontal scaling.
 - **Corpus URLs are pinned to specific document revisions.** When the SBA publishes a new SOP, `ingestion/manifest.py` needs updating.

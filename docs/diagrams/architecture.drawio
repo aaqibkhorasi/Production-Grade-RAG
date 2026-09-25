@@ -34,7 +34,7 @@
     <mxCell id="ing1" value="Download&#10;Corpus" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCE9F9;strokeColor=#4477AA;fontSize=11;" vertex="1" parent="1">
       <mxGeometry x="345" y="160" width="130" height="60" as="geometry" />
     </mxCell>
-    <mxCell id="ing2" value="Load + Chunk&#10;(max 800 tok,&#10;100 tok overlap)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCE9F9;strokeColor=#4477AA;fontSize=11;" vertex="1" parent="1">
+    <mxCell id="ing2" value="Load + Chunk&#10;(provision-aware,&#10;~450 tok median)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCE9F9;strokeColor=#4477AA;fontSize=11;" vertex="1" parent="1">
       <mxGeometry x="495" y="160" width="130" height="60" as="geometry" />
     </mxCell>
     <mxCell id="ing3" value="Embed + Upsert&#10;(Titan v2)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCE9F9;strokeColor=#4477AA;fontSize=11;" vertex="1" parent="1">

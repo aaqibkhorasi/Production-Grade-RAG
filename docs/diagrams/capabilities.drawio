@@ -19,7 +19,7 @@
     <mxCell id="i1a" value="Download SBA / eCFR&#10;sources" style="shape=image;html=1;verticalAlign=top;verticalLabelPosition=bottom;labelBackgroundColor=default;imageAspect=0;aspect=fixed;image=https://icons.diagrams.net/assets/flat-color-icons/1/Document.svg;fontSize=11;fontColor=#333333;" vertex="1" parent="1">
       <mxGeometry x="140" y="175" width="48" height="48" as="geometry" />
     </mxCell>
-    <mxCell id="i1b" value="Chunk max 800 tok&#10;(100 tok overlap)" style="shape=image;html=1;verticalAlign=top;verticalLabelPosition=bottom;labelBackgroundColor=default;imageAspect=0;aspect=fixed;image=https://icons.diagrams.net/assets/flat-color-icons/1/Refresh.svg;fontSize=11;fontColor=#333333;" vertex="1" parent="1">
+    <mxCell id="i1b" value="Provision-aware chunks&#10;(heading-scoped, ~450 tok)" style="shape=image;html=1;verticalAlign=top;verticalLabelPosition=bottom;labelBackgroundColor=default;imageAspect=0;aspect=fixed;image=https://icons.diagrams.net/assets/flat-color-icons/1/Refresh.svg;fontSize=11;fontColor=#333333;" vertex="1" parent="1">
       <mxGeometry x="350" y="175" width="48" height="48" as="geometry" />
     </mxCell>
 
