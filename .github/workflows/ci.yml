@@ -39,7 +39,10 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
-      - run: pytest eval/
+      # eval/conftest.py appends the tracked-metric table to $GITHUB_STEP_SUMMARY,
+      # so the scores render on the run page instead of only in the step log.
+      - name: Run golden set evaluation
+        run: pytest eval/
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}

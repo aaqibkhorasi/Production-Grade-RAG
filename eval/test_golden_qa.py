@@ -8,11 +8,17 @@ expected source document -- both come straight from our own deterministic
 pipeline state, not an LLM judge, so they're reliable enough to block on.
 "should_decline" cases must have grounded=False.
 
-Tracked signals (warn, don't fail CI): Faithfulness, ContextualPrecision, and
-ContextualRelevancy, scored by a DeepEval/Bedrock judge on a single flaky
-LLMTestCase. All three were tried as hard gates first and dropped to
-non-blocking after live investigation showed their failures traced to judge
-limitations, not pipeline defects, on this corpus:
+Tracked signals (recorded, never fail CI): Faithfulness, ContextualPrecision
+and ContextualRelevancy, scored by a DeepEval/Bedrock judge. Each metric is
+measured directly rather than through assert_test, so a score is a value this
+suite owns and reports (see conftest.py) instead of warning text buried in the
+log. Nothing about them can fail the run, which also removes the need for
+DeepEval's `flaky` handling -- that only downgrades assert_test's own
+AssertionError and never covered a crash inside metric computation.
+
+All three were tried as hard gates first and dropped to non-blocking after
+live investigation showed their failures traced to judge limitations, not
+pipeline defects, on this corpus:
 - Faithfulness: manually reproducing generate()+grounding_check() 4x on a
   failing case gave the identical, correct answer and GROUNDED=True every
   time -- the pipeline is deterministic and correct. DeepEval's own
@@ -23,10 +29,11 @@ limitations, not pipeline defects, on this corpus:
 - ContextualPrecision / ContextualRelevancy: Bedrock's Cohere reranker
   returns near-uniform scores (within ~0.04) across chunks from different
   sections of the same source document on this corpus, including sections
-  that don't address the specific question -- not fixable by score floors or
-  TOP_K tuning (verified: the correct chunk isn't even reliably top-ranked).
-  Would need finer-grained chunking (by fee tier/provision instead of by
-  section) to fix properly. Separately, Haiku as judge occasionally returned
+  that don't address the specific question. Provision-aware chunking cleared
+  ContextualPrecision entirely but left ContextualRelevancy flat, since that
+  measures the proportion of retrieved context that is relevant and retrieval
+  still returns a fixed TOP_K however many chunks help. Separately, Haiku as
+  judge occasionally returned
   malformed structured output for these metrics' verdict schemas
   (DeepEvalError: invalid JSON; a Pydantic literal_error on a "partial"
   verdict outside the yes/no enum) -- a judge-model reliability limit, not a
@@ -47,11 +54,9 @@ the default `pytest` run (see pyproject.toml's testpaths). Run explicitly:
 
 import json
 import os
-import warnings
 from pathlib import Path
 
 import pytest
-from deepeval import assert_test
 from deepeval.metrics import ContextualPrecisionMetric, ContextualRelevancyMetric, FaithfulnessMetric
 from deepeval.models import AmazonBedrockModel
 from deepeval.test_case import LLMTestCase
@@ -74,8 +79,16 @@ def judge_model():
     )
 
 
+def _tracked_metrics(judge_model):
+    return [
+        FaithfulnessMetric(threshold=QUALITY_THRESHOLD, model=judge_model, penalize_ambiguous_claims=True),
+        ContextualPrecisionMetric(threshold=QUALITY_THRESHOLD, model=judge_model),
+        ContextualRelevancyMetric(threshold=QUALITY_THRESHOLD, model=judge_model),
+    ]
+
+
 @pytest.mark.parametrize("case", ANSWERABLE_CASES, ids=[c["id"] for c in ANSWERABLE_CASES])
-def test_answerable_case_is_grounded_and_cites_expected_source(case, judge_model):
+def test_answerable_case_is_grounded_and_cites_expected_source(case, judge_model, metric_recorder):
     result = run_query(case["question"])
     citations = result.get("citations", [])
     cited_source_docs = [c["source_doc"] for c in citations]
@@ -91,28 +104,18 @@ def test_answerable_case_is_grounded_and_cites_expected_source(case, judge_model
         actual_output=result["answer"],
         expected_output=case["reference_answer"],
         retrieval_context=contexts or [""],
-        flaky=True,
     )
-    try:
-        assert_test(
-            test_case,
-            [
-                FaithfulnessMetric(threshold=QUALITY_THRESHOLD, model=judge_model, penalize_ambiguous_claims=True),
-                ContextualPrecisionMetric(threshold=QUALITY_THRESHOLD, model=judge_model),
-                ContextualRelevancyMetric(threshold=QUALITY_THRESHOLD, model=judge_model),
-            ],
-        )
-    except AssertionError:
-        raise  # flaky=True already downgrades genuine score failures to warnings; a real one is a bug.
-    except Exception as exc:
-        # `flaky` only intercepts assert_test's own AssertionError -- it can't
-        # catch a raw crash from *inside* metric computation. Seen in practice:
-        # Bedrock/Haiku's judge output contained an apostrophe that broke
-        # DeepEval's regex-based JSON extraction, raising JSONDecodeError
-        # before assert_test's pass/fail logic ever ran. These three metrics
-        # are tracked signals, not hard gates (see module docstring) -- a
-        # judge-tooling crash should degrade the same way a low score does.
-        warnings.warn(f"{case['id']}: tracked-metric judge call failed ({exc!r}), skipping tracked signal")
+    for metric in _tracked_metrics(judge_model):
+        try:
+            metric.measure(test_case)
+            metric_recorder.record(case["id"], metric.__name__, metric.score, QUALITY_THRESHOLD)
+        except Exception as exc:
+            # The judge's own tooling can crash before producing a score -- seen
+            # in practice when Haiku's output contained an apostrophe that broke
+            # DeepEval's regex-based JSON extraction. These are tracked signals,
+            # so a judge-tooling crash is recorded and skipped, exactly as a low
+            # score would be; it never fails the run.
+            metric_recorder.record(case["id"], metric.__name__, None, QUALITY_THRESHOLD, error=repr(exc))
 
 
 @pytest.mark.parametrize("case", DECLINE_CASES, ids=[c["id"] for c in DECLINE_CASES])
