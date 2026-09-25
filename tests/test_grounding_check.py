@@ -68,3 +68,25 @@ def test_grounding_check_prompt_includes_context_and_draft_answer():
     human_message = messages[1][1]
     assert "10%" in human_message
     assert "sop.docx" in human_message
+
+
+def test_grounding_check_declines_deterministically_on_the_insufficient_marker():
+    # `grounded` is a hard gate, so it must not depend on an LLM judge agreeing.
+    # When the generator reports it cannot answer, that is a fact about the
+    # pipeline: decline without calling the judge at all.
+    chat_model = Mock()
+    state = {
+        "question": "What is the interest rate cap on SBA 504 loans?",
+        "answer": "INSUFFICIENT_CONTEXT",
+        "retrieved_chunks": [
+            {"source_doc": "sop.docx", "effective_date": "2026-10-01",
+             "program": "core", "chunk_text": "7(a) interest rate maximums are ..."}
+        ],
+    }
+
+    result = grounding_check(state, chat_model=chat_model)
+
+    assert result["grounded"] is False
+    assert result["citations"] == []
+    assert "INSUFFICIENT_CONTEXT" not in result["answer"]
+    chat_model.invoke.assert_not_called()

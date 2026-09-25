@@ -30,3 +30,12 @@ def test_generate_prompt_does_not_ask_model_to_self_report_sources():
     assert "list the source documents" not in system_prompt
     human_template = _load_prompts()["generate_answer"]["human_template"].lower()
     assert "list the source documents" not in human_template
+
+
+def test_generate_prompt_defines_the_marker_it_is_told_to_emit():
+    # The marker is how grounding_check detects a decline deterministically, so
+    # the string the generator is instructed to emit and the string the pipeline
+    # looks for must be the same one.
+    prompts = _load_prompts()
+    marker = prompts["insufficient_context_marker"].strip()
+    assert marker in prompts["generate_answer"]["system"]
