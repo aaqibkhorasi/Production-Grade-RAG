@@ -20,7 +20,7 @@ Most RAG demos stop at "embed some text, stuff it in a prompt." The interesting 
 
 **Hybrid retrieval.** Every query runs both a dense vector search (Chroma) and a BM25 keyword search in parallel, then unions and de-duplicates the candidate pools. Dense search handles paraphrase; BM25 handles the exact statutory language — "Form 1050", "13 CFR 121.103" — that embeddings tend to blur.
 
-**Cross-encoder reranking.** The ~30-candidate pool is re-scored against the question by Bedrock's hosted Cohere reranker (`cohere.rerank-v3-5:0`) and narrowed to the top 5. Candidates scoring below a relevance floor are dropped rather than padding the context to a fixed size.
+**Cross-encoder reranking with an adaptive cutoff.** The ~30-candidate pool is re-scored against the question by Bedrock's hosted Cohere reranker (`cohere.rerank-v3-5:0`). `TOP_K = 5` is a ceiling, not a quota: chunks scoring below 85% of the best chunk's score are dropped, so a question with one clear answer returns one chunk and only a genuinely multi-part question returns five. This is what keeps the context from being padded with topically adjacent provisions.
 
 **Two-stage grounding enforcement.** A cheap pre-generation gate declines immediately when nothing relevant was retrieved, skipping the expensive generation path entirely. After generation, a second LLM pass verifies that the drafted answer actually follows from the retrieved chunks. That check is *fail-closed*: any exception, timeout, or unparseable verdict resolves to "not grounded," never to "grounded."
 
@@ -46,7 +46,7 @@ question ─▶ retrieve ─▶ grounding_gate ─▶ generate ─▶ grounding_
                 │             ▼ nothing relevant            ▼ not supported by context
                 │          decline                       decline
                 │
-                └─ vector search ∪ BM25 search ─▶ rerank ─▶ top 5 above relevance floor
+                └─ vector search ∪ BM25 search ─▶ rerank ─▶ keep those near the top score
 ```
 
 | Layer | Path | Responsibility |
@@ -135,10 +135,10 @@ run_ingestion()
 This costs a few cents in embedding calls and takes roughly a minute. Expect output close to:
 
 ```
-ingested source_doc=sop_50_10_8_1.docx        text_chars=906205  chunks=269
-ingested source_doc=cfr_121_affiliation.html  text_chars=300589  chunks=94
-ingested source_doc=notice_7a_fees_fy2026.pdf text_chars=9721    chunks=4
-ingestion complete: sources=3 total_chunks=367
+ingested source_doc=sop_50_10_8_1.docx        text_chars=900119  chunks=522
+ingested source_doc=cfr_121_affiliation.html  text_chars=300589  chunks=163
+ingested source_doc=notice_7a_fees_fy2026.pdf text_chars=8846    chunks=6
+ingestion complete: sources=3 total_chunks=691
 ```
 
 Ingestion fails loudly if a source extracts far less text than expected, rather than silently indexing a bot-check page. The vector store lands in `chroma_db/` (gitignored — it is a build artifact, not source).
@@ -226,19 +226,23 @@ They are non-blocking on purpose. During development the judge was measurably th
 
 A `NonAdvice` metric was tried and removed: in a regulatory-explainer domain it scored 0.0 on accurate restatements of SBA policy, which is exactly what the system is supposed to produce.
 
-**What the tracked metrics currently say.** Moving from uniform 800-token windows to provision-aware chunking produced this, over the same 18 answerable cases:
+**What the tracked metrics currently say.** Two changes were measured against the 18 answerable cases — provision-aware chunking, then an adaptive relevance floor on retrieval. Cases below the 0.7 threshold, with the mean in brackets:
 
-| Metric | Uniform 800-token windows | Provision-aware chunks |
-| --- | --- | --- |
-| Faithfulness | 14 cases below threshold | **8–10** |
-| Contextual Precision | 1 case below threshold | **0** (mean 0.97) |
-| Contextual Relevancy | 11 cases below threshold | **10–12** |
+| Configuration | Faithfulness | Contextual Precision | Contextual Relevancy |
+| --- | --- | --- | --- |
+| Uniform 800-token chunks, fixed `TOP_K = 5` | 14 | 1 | 11 |
+| Provision-aware chunks | 9–10 (0.66–0.69) | 0 (0.97–0.98) | 10 (0.64–0.65) |
+| …plus adaptive relevance floor | **6–9** (0.70–0.72) | **0** (0.98–1.00) | **4–6** (0.71–0.74) |
 
-The ranges are not hedging. Running the suite twice against identical code and an identical index gave Faithfulness 8 then 10, and Relevancy 12 then 10 — the judge has a run-to-run spread of roughly ±2 cases, so any difference smaller than that is noise. Worth knowing before reading anything into a single run.
+**Read the ranges, not the single numbers.** Running the suite against identical code and an identical index gives a spread of roughly ±2 cases: the judge is itself a sampled LLM. Anything smaller than that spread is not a result.
 
-Against that noise floor: Faithfulness improved by more than the spread, so the gain is real. Precision cleared entirely. **Contextual Relevancy did not move** — which is worth stating plainly, because it was the metric the change was aimed at.
+On that basis:
 
-The likely reason is that Relevancy measures the *proportion* of retrieved statements that bear on the question, and retrieval still returns a fixed `TOP_K = 5` regardless of how many chunks actually help. Smaller, cleaner chunks make each one more focused but do not change the ratio when four of the five are adjacent provisions. The lever for that is adaptive `TOP_K` or a higher per-chunk relevance floor, not chunk boundaries — see [Known limitations](#known-limitations).
+- **Contextual Relevancy improved, and the floor is what did it** — 10 cases below threshold down to 4–6, a change well outside the spread. Chunking alone had left it flat; see the note on `TOP_K` below for why.
+- **Contextual Precision is effectively solved**, mean 0.98–1.00.
+- **Faithfulness is ambiguous.** The mean rose consistently (0.66 → 0.71) but the case count swung 6 to 9 between runs of the same code, so the honest reading is a modest improvement, not the halving the best run suggests.
+
+Chunking did not move Relevancy because that metric measures the *proportion* of retrieved statements bearing on the question, and retrieval was returning a fixed `TOP_K = 5` regardless of how many chunks helped. Smaller chunks make each one more focused without changing the ratio. Scoring the floor relative to the best chunk in each result set does change it — see `RELEVANCE_RATIO` in `pipeline/retrieve.py`.
 
 ## CI
 
@@ -255,8 +259,9 @@ Note that CI rebuilds the index from scratch on every run and makes real Bedrock
 
 ## Known limitations
 
-- **Retrieval always returns `TOP_K = 5` chunks**, however many actually bear on the question, so the context is padded with adjacent provisions. This is the remaining cause of the Contextual Relevancy scores above; adaptive `TOP_K` or a higher relevance floor is the fix.
-- **The grounding gate threshold is not empirically calibrated.** It is a conservative starting value chosen from observed rerank score distributions, not tuned against labelled data. The same value doubles as the per-chunk relevance floor, where `0.2` is permissive.
+- **`RELEVANCE_RATIO` is tuned against 22 golden cases**, which is a small sample. It holds the citation gate on all of them, but a wider corpus could want a different value.
+- **A flat rerank curve defeats the relevance floor.** When every candidate scores within a few percent of the best — as happens on the fee notice, which is only six chunks, so retrieval returns most of the document — nothing is trimmed. These are the cases still below the Relevancy threshold.
+- **The grounding gate threshold is not empirically calibrated.** `0.2` is a conservative starting value chosen from observed rerank score distributions, not tuned against labelled data.
 - **PDF heading detection is heuristic.** A PDF carries no structural markup, so headings are inferred from line length, capitalisation and a trailing colon. It works on the fee notice; a differently formatted notice may need the rules revisited.
 - **The BM25 index is per-process and in-memory.** It rebuilds on first use after ingestion invalidates it, which does not survive horizontal scaling.
 - **Corpus URLs are pinned to specific document revisions.** When the SBA publishes a new SOP, `ingestion/manifest.py` needs updating.
