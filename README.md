@@ -232,13 +232,13 @@ A `NonAdvice` metric was tried and removed: in a regulatory-explainer domain it 
 | --- | --- | --- | --- |
 | Uniform 800-token chunks, fixed `TOP_K = 5` | 14 | 1 | 11 |
 | Provision-aware chunks | 9–10 (0.66–0.69) | 0 (0.97–0.98) | 10 (0.64–0.65) |
-| …plus adaptive relevance floor | **6–9** (0.70–0.72) | **0** (0.98–1.00) | **4–6** (0.71–0.74) |
+| …plus adaptive relevance floor | **6–9** (0.70–0.72) | **0** (0.98–1.00) | **4–7** (0.71–0.74) |
 
-**Read the ranges, not the single numbers.** Running the suite against identical code and an identical index gives a spread of roughly ±2 cases: the judge is itself a sampled LLM. Anything smaller than that spread is not a result.
+**Read the ranges, not the single numbers.** Running the suite against identical code and an identical index gives a spread of roughly ±2 cases, and across four runs Contextual Relevancy landed on 4, 6, 6 and 7 — so treat ±3 as the honest band. The judge is itself a sampled LLM. Anything inside that spread is not a result.
 
 On that basis:
 
-- **Contextual Relevancy improved, and the floor is what did it** — 10 cases below threshold down to 4–6, a change well outside the spread. Chunking alone had left it flat; see the note on `TOP_K` below for why.
+- **Contextual Relevancy improved, and the floor is what did it** — 10–11 cases below threshold down to 4–7, a change clear of the spread even at its worst. Chunking alone had left it flat; see the note on `TOP_K` below for why.
 - **Contextual Precision is effectively solved**, mean 0.98–1.00.
 - **Faithfulness is ambiguous.** The mean rose consistently (0.66 → 0.71) but the case count swung 6 to 9 between runs of the same code, so the honest reading is a modest improvement, not the halving the best run suggests.
 
@@ -260,8 +260,8 @@ Note that CI rebuilds the index from scratch on every run and makes real Bedrock
 ## Known limitations
 
 - **`RELEVANCE_RATIO` is tuned against 22 golden cases**, which is a small sample. It holds the citation gate on all of them, but a wider corpus could want a different value.
-- **A flat rerank curve defeats the relevance floor.** When every candidate scores within a few percent of the best — as happens on the fee notice, which is only six chunks, so retrieval returns most of the document — nothing is trimmed. These are the cases still below the Relevancy threshold.
+- **A flat rerank curve defeats the relevance floor.** When every candidate scores within a few percent of the best, nothing is trimmed and the context stays padded. Two fee-notice cases sit below the Relevancy threshold for this reason.
 - **The grounding gate threshold is not empirically calibrated.** `0.2` is a conservative starting value chosen from observed rerank score distributions, not tuned against labelled data.
-- **PDF heading detection is heuristic.** A PDF carries no structural markup, so headings are inferred from line length, capitalisation and a trailing colon. It works on the fee notice; a differently formatted notice may need the rules revisited.
+- **PDF heading detection is heuristic, and a missed heading misfiles its provision.** A PDF carries no structural markup, so headings are inferred from line length, capitalisation and a trailing colon. Where a provision's opening line wraps instead of ending in a colon, it is not recognised and its text is filed under the previous heading. The fee notice does this once: the short-term fee rule ends up under "For loans with a maturity that exceeds 12 months", so a chunk answering a question about 12 months *or less* is labelled with its opposite. The heading prefix that helps retrieval everywhere else works against it here.
 - **The BM25 index is per-process and in-memory.** It rebuilds on first use after ingestion invalidates it, which does not survive horizontal scaling.
 - **Corpus URLs are pinned to specific document revisions.** When the SBA publishes a new SOP, `ingestion/manifest.py` needs updating.
