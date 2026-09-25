@@ -1,6 +1,11 @@
 import tiktoken
 
-from ingestion.chunker import CHUNK_MAX_TOKENS, CHUNK_OVERLAP_TOKENS, chunk_document
+from ingestion.chunker import (
+    CHUNK_MAX_TOKENS,
+    CHUNK_MIN_STANDALONE_TOKENS,
+    CHUNK_OVERLAP_TOKENS,
+    chunk_document,
+)
 from ingestion.loader import Document, Section
 
 _ENCODING = tiktoken.get_encoding("cl100k_base")
@@ -102,3 +107,21 @@ def test_no_chunk_exceeds_the_hard_ceiling():
 
     for chunk in chunk_document(document):
         assert len(_ENCODING.encode(chunk.text)) <= CHUNK_MAX_TOKENS + 64  # + heading prefix
+
+
+def test_sections_large_enough_to_stand_alone_are_not_packed_together():
+    # Each of these is a distinct fee provision. Merging them is what let a
+    # question about the annual service fee retrieve the upfront fee tiers too.
+    body = "detail " * 150  # comfortably over CHUNK_MIN_STANDALONE_TOKENS (120)
+    document = _sectioned(
+        Section(heading_path=("Annual Service Fee",), text=body),
+        Section(heading_path=("Upfront Fee for EWCP loans",), text=body),
+    )
+
+    assert len(_ENCODING.encode(body)) >= CHUNK_MIN_STANDALONE_TOKENS
+
+    chunks = chunk_document(document)
+
+    assert len(chunks) == 2
+    assert "Annual Service Fee" in chunks[0].text
+    assert "EWCP" not in chunks[0].text

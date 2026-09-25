@@ -15,6 +15,16 @@ CHUNK_MAX_TOKENS = 800
 CHUNK_TARGET_TOKENS = 450
 # Only used for a single unbroken run of text with no structure to split on.
 CHUNK_OVERLAP_TOKENS = 100
+# A section this size or larger becomes its own chunk rather than being packed
+# with its neighbours.
+#
+# Packing everything up to the target merged whole provisions together: the fee
+# notice's 14 sections collapsed into 6 chunks, so a question about the annual
+# service fee retrieved a chunk that also held the upfront fee tiers. Since the
+# notice is the entire corpus for fee questions, retrieval then returned most of
+# the document and no relevance floor could trim it -- every chunk scored alike.
+# Packing now applies only to fragments too small to stand on their own.
+CHUNK_MIN_STANDALONE_TOKENS = 120
 
 
 @dataclass(frozen=True)
@@ -95,8 +105,13 @@ def chunk_document(document: Document) -> list[Chunk]:
             for piece in _split_section_body(section.text):
                 texts.append(f"{heading}\n\n{piece}" if heading else piece)
             continue
-        # Short sections pack together rather than becoming their own tiny
-        # chunk, but never across the target size.
+        # A section that can stand on its own does, so one provision stays one
+        # chunk. Only fragments below that size pack together, and never across
+        # the target.
+        if body_size >= CHUNK_MIN_STANDALONE_TOKENS:
+            flush()
+            texts.append(f"{heading}\n\n{section.text}" if heading else section.text)
+            continue
         if buffer and size + body_size > CHUNK_TARGET_TOKENS:
             flush()
         buffer.append(f"{heading}\n\n{section.text}" if heading else section.text)
