@@ -71,12 +71,36 @@ ANSWERABLE_CASES = [c for c in GOLDEN_SET if c["category"] == "answerable"]
 DECLINE_CASES = [c for c in GOLDEN_SET if c["category"] == "should_decline"]
 
 
+# The judge's verdicts come back as structured JSON, and Haiku intermittently
+# breaks the schema on the Contextual Precision prompt -- malformed JSON, or a
+# "partial" verdict where the enum allows only yes/no. It is sampled output, so
+# a second attempt usually succeeds. Set EVAL_JUDGE_MODEL_ID to a stronger model
+# to trade eval cost for fewer retries.
+JUDGE_ATTEMPTS = 2
+
+
 @pytest.fixture(scope="module")
 def judge_model():
     return AmazonBedrockModel(
-        model=os.getenv("CHAT_MODEL_ID") or "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+        model=(
+            os.getenv("EVAL_JUDGE_MODEL_ID")
+            or os.getenv("CHAT_MODEL_ID")
+            or "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+        ),
         region=os.getenv("AWS_REGION") or "us-east-1",
     )
+
+
+def _measure(metric, test_case) -> tuple[float | None, str | None]:
+    """Score one metric, retrying a judge that returned unusable output."""
+    failure = None
+    for _ in range(JUDGE_ATTEMPTS):
+        try:
+            metric.measure(test_case)
+            return metric.score, None
+        except Exception as exc:
+            failure = exc
+    return None, repr(failure)
 
 
 def _tracked_metrics(judge_model):
@@ -106,16 +130,11 @@ def test_answerable_case_is_grounded_and_cites_expected_source(case, judge_model
         retrieval_context=contexts or [""],
     )
     for metric in _tracked_metrics(judge_model):
-        try:
-            metric.measure(test_case)
-            metric_recorder.record(case["id"], metric.__name__, metric.score, QUALITY_THRESHOLD)
-        except Exception as exc:
-            # The judge's own tooling can crash before producing a score -- seen
-            # in practice when Haiku's output contained an apostrophe that broke
-            # DeepEval's regex-based JSON extraction. These are tracked signals,
-            # so a judge-tooling crash is recorded and skipped, exactly as a low
-            # score would be; it never fails the run.
-            metric_recorder.record(case["id"], metric.__name__, None, QUALITY_THRESHOLD, error=repr(exc))
+        # A judge that fails every attempt is recorded and skipped, exactly as a
+        # low score would be. These are tracked signals; nothing here fails the
+        # run, and a judge-tooling crash must not either.
+        score, error = _measure(metric, test_case)
+        metric_recorder.record(case["id"], metric.__name__, score, QUALITY_THRESHOLD, error=error)
 
 
 @pytest.mark.parametrize("case", DECLINE_CASES, ids=[c["id"] for c in DECLINE_CASES])
