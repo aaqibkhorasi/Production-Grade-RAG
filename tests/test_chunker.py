@@ -1,7 +1,7 @@
 import tiktoken
 
 from ingestion.chunker import CHUNK_MAX_TOKENS, CHUNK_OVERLAP_TOKENS, chunk_document
-from ingestion.loader import Document
+from ingestion.loader import Document, Section
 
 _ENCODING = tiktoken.get_encoding("cl100k_base")
 
@@ -42,3 +42,63 @@ def test_chunk_document_ids_are_deterministic():
 def test_chunk_document_indexes_are_sequential():
     chunks = chunk_document(_make_document(1600))
     assert [c.chunk_index for c in chunks] == list(range(len(chunks)))
+
+
+def _sectioned(*sections) -> Document:
+    return Document(
+        text="\n".join(s.text for s in sections),
+        source_doc="test.docx", effective_date="2026-01-01", program="core",
+        sections=tuple(sections),
+    )
+
+
+def test_chunk_text_carries_the_heading_path():
+    # Without this a chunk about EWCP fees never contains the word "EWCP", so
+    # neither the embedding nor BM25 can match the question to it.
+    document = _sectioned(
+        Section(heading_path=("Section A", "Upfront Fee for EWCP loans"),
+                text="The fee is 0.25% of the guaranteed portion."),
+    )
+
+    chunks = chunk_document(document)
+
+    assert len(chunks) == 1
+    assert "Section A > Upfront Fee for EWCP loans" in chunks[0].text
+    assert "0.25%" in chunks[0].text
+
+
+def test_long_section_splits_on_line_boundaries_not_mid_provision():
+    provisions = [f"({i}) Provision {i}: " + "detail " * 60 for i in range(20)]
+    document = _sectioned(Section(heading_path=("Fees",), text="\n".join(provisions)))
+
+    chunks = chunk_document(document)
+
+    assert len(chunks) > 1
+    for chunk in chunks:
+        body = chunk.text.split("\n\n", 1)[1]
+        for line in body.split("\n"):
+            assert line in provisions, f"split landed mid-provision: {line[:60]!r}"
+
+
+def test_small_sibling_sections_pack_into_one_chunk():
+    # Otherwise each one-line section becomes its own tiny, low-signal chunk.
+    document = _sectioned(
+        Section(heading_path=("Questions",), text="Direct questions to the field office."),
+        Section(heading_path=("Contact",), text="Call the Lender Relations Specialist."),
+    )
+
+    chunks = chunk_document(document)
+
+    assert len(chunks) == 1
+    assert "field office" in chunks[0].text
+    assert "Lender Relations" in chunks[0].text
+
+
+def test_no_chunk_exceeds_the_hard_ceiling():
+    document = _sectioned(
+        Section(heading_path=("A",), text="\n".join("word " * 200 for _ in range(30))),
+        Section(heading_path=("B",), text="single unbroken run " * 900),
+    )
+
+    for chunk in chunk_document(document):
+        assert len(_ENCODING.encode(chunk.text)) <= CHUNK_MAX_TOKENS + 64  # + heading prefix
