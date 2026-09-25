@@ -8,8 +8,23 @@ from pipeline.grounding_gate import GROUNDING_GATE_THRESHOLD
 from pipeline.rerank import rerank
 from pipeline.state import Citation, QueryState
 
-TOP_K = 5
+TOP_K = 5  # ceiling, not a quota -- RELEVANCE_RATIO usually returns fewer
 CANDIDATE_K = 15  # pool size per retrieval method, before reranking narrows to TOP_K
+
+# Keep only chunks scoring within this fraction of the best chunk's score.
+#
+# An absolute floor cannot do this job: across the golden set the top score for
+# a question the corpus cannot answer (0.72) sits above the second-best score
+# for one it can (0.53), so any single cutoff either pads good answers or
+# starves them. What does separate them is the shape of the curve -- a question
+# with one right answer drops 40% after the top chunk, while a genuinely
+# multi-chunk question stays flat -- so the floor is set relative to the top
+# score and adapts per query.
+#
+# 0.85 was chosen by measuring every golden case: it takes the average answerable
+# case from 5 chunks to 3.5 while still retrieving the expected source document
+# for all 18, which is the citation hard gate.
+RELEVANCE_RATIO = 0.85
 
 logger = logging.getLogger(__name__)
 
@@ -57,9 +72,15 @@ def retrieve(state: QueryState, collection=None) -> QueryState:
         # that many candidates are actually relevant -- padding the answer with
         # topically-adjacent-but-irrelevant chunks (e.g. other sections of the
         # same source document) that dilute both the generated answer's context
-        # and the citations shown to the user. Drop anything below the same
-        # floor grounding_gate already treats as "not meaningfully relevant".
-        top_candidates = [c for c in reranked if c["score"] >= GROUNDING_GATE_THRESHOLD]
+        # and the citations shown to the user.
+        #
+        # Two floors apply. The relative one trims that padding per query. The
+        # absolute one is the same bar grounding_gate uses, and still matters
+        # when every candidate is weak: without it a query the corpus cannot
+        # answer would keep its best chunks purely for being the best of a bad
+        # set, since they always score 100% of the top score.
+        relevance_floor = max(GROUNDING_GATE_THRESHOLD, top_rerank_score * RELEVANCE_RATIO)
+        top_candidates = [c for c in reranked if c["score"] >= relevance_floor]
         retrieved = [
             Citation(
                 source_doc=c["metadata"]["source_doc"],
