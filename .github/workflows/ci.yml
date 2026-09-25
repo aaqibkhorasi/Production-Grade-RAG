@@ -26,6 +26,16 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install -r requirements.txt
+      # The corpus is fetched from sba.gov and ecfr.gov on every run otherwise.
+      # eCFR started answering 200 with a short challenge page after repeated
+      # requests from the runner, which failed the build. Caching keyed on the
+      # manifest means a given set of source URLs is fetched once; editing the
+      # manifest changes the key and re-downloads.
+      - name: Cache the downloaded corpus
+        uses: actions/cache@v4
+        with:
+          path: data/raw
+          key: corpus-${{ hashFiles('ingestion/manifest.py') }}
       - name: Download corpus and build the vector store
         run: |
           python -m ingestion.download_corpus
