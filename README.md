@@ -232,13 +232,13 @@ A `NonAdvice` metric was tried and removed: in a regulatory-explainer domain it 
 | --- | --- | --- | --- |
 | Uniform 800-token chunks, fixed `TOP_K = 5` | 14 | 1 | 11 |
 | Provision-aware chunks | 9–10 (0.66–0.69) | 0 (0.97–0.98) | 10 (0.64–0.65) |
-| …plus adaptive relevance floor | **6–9** (0.70–0.72) | **0** (0.98–1.00) | **4–7** (0.71–0.74) |
+| …plus adaptive relevance floor | **6–10** (0.70–0.78) | **0** (0.96–1.00) | **3–7** (0.71–0.76) |
 
-**Read the ranges, not the single numbers.** Running the suite against identical code and an identical index gives a spread of roughly ±2 cases, and across four runs Contextual Relevancy landed on 4, 6, 6 and 7 — so treat ±3 as the honest band. The judge is itself a sampled LLM. Anything inside that spread is not a result.
+**Read the ranges, not the single numbers.** Running the suite against identical code and an identical index gives a spread of roughly ±2 cases, and across six runs Contextual Relevancy landed on 3, 4, 6, 6, 6 and 7 — so treat ±3 as the honest band. The judge is itself a sampled LLM. Anything inside that spread is not a result.
 
 On that basis:
 
-- **Contextual Relevancy improved, and the floor is what did it** — 10–11 cases below threshold down to 4–7, a change clear of the spread even at its worst. Chunking alone had left it flat; see the note on `TOP_K` below for why.
+- **Contextual Relevancy improved, and the floor is what did it** — 10–11 cases below threshold down to 3–7, a change clear of the spread even at its worst. Chunking alone had left it flat; see the note on `TOP_K` below for why.
 - **Not everything worked.** Splitting wrapped headings in the PDF was expected to lift the fee-notice cases and did not: the target case moved 0.37 to 0.30, inside the spread either way. It is kept because it fixes a defect that does not need a judge to see — the short-term fee rule was filed under "for loans with a maturity that exceeds 12 months", so a citation shown to the user contradicted the text beneath it. The relevancy those cases lose turns out to come from somewhere else entirely, recorded under known limitations.
 - **Contextual Precision is effectively solved**, mean 0.98–1.00.
 - **Faithfulness is ambiguous.** The mean rose consistently (0.66 → 0.71) but the case count swung 6 to 9 between runs of the same code, so the honest reading is a modest improvement, not the halving the best run suggests.
