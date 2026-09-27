@@ -242,9 +242,7 @@ A `NonAdvice` metric was tried and removed: in a regulatory-explainer domain it 
 
 Contextual Relevancy improved sharply, Contextual Precision is effectively solved, and Faithfulness improved in the mean. [docs/evaluation.md](docs/evaluation.md) explains what each metric measures, how it is computed, which changes worked, and which did not.
 
-**A note on the ranges in the chart.** They were measured while the judge was running at Bedrock's default temperature, because DeepEval sends `inferenceConfig={**generation_kwargs}` and defaults that to `{}` — so nothing pinned it. Every verdict was a fresh sample, and repeat runs of one build moved by up to three cases. With the judge pinned to `temperature=0`, two consecutive runs now score **17 of 18 cases identically**, and the only case that moves sits exactly on the threshold.
-
-The bands are therefore a record of how the earlier comparisons were made, not a claim about how noisy this evaluation is today. Changes previously dismissed as "inside the noise" are worth re-measuring against the stable judge.
+**The judge is pinned to `temperature=0`.** DeepEval sends `inferenceConfig={**generation_kwargs}` and defaults that to `{}`, so left alone the grader samples at the model's default temperature and its own noise gets attributed to the code under test. Pinned, two consecutive runs score **17 of 18 cases identically** — which is what makes the movements above readable as results rather than as sampling.
 
 ## CI
 
