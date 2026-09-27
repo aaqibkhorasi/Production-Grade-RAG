@@ -113,7 +113,7 @@ Three retrieval changes were made and measured against the golden set. Recording
 | Provision-aware chunking | 10 | **No effect on this metric** |
 | Adaptive relevance floor (`RELEVANCE_RATIO`) | 3–7 | **Worked** — clears the noise band |
 | Splitting wrapped PDF headings | unchanged | **No effect** |
-| Cross-source filtering (`CROSS_SOURCE_TIE_RATIO`) | 4–6 | **Inside noise** — not proven |
+| Cross-source filtering (`CROSS_SOURCE_TIE_RATIO`) | 4 | **Small, real, narrow** — see the A/B below |
 
 **Chunking did not move Relevancy** because the metric is a ratio of relevant statements to total statements. Better chunk boundaries make each chunk more focused without changing that ratio while retrieval still returns a fixed five chunks. It did improve Faithfulness and Precision, and it fixed real defects, so it was kept.
 
@@ -121,7 +121,19 @@ Three retrieval changes were made and measured against the golden set. Recording
 
 **Splitting wrapped PDF headings did not help,** though it was aimed squarely at the fee-notice cases. It is kept because it fixes a defect no judge is needed to see: the short-term fee rule had been filed under "for loans with a maturity that exceeds 12 months", so a citation shown to the user contradicted the text beneath it.
 
-**Cross-source filtering** stops a fee question returning SOP sections alongside the fee notice. Measured across the golden set it never costs the expected source document and cuts average context from 3.6 chunks to 3.2, so fewer unrelated documents appear in the citation panel. Its effect on Relevancy is inside the spread, so it is not claimed as an improvement.
+**Cross-source filtering** stops a fee question returning SOP sections alongside the fee notice. It never costs the expected source document and cuts average context from 3.6 chunks to 3.2.
+
+Re-measured as a direct A/B once the judge was deterministic, which is the only comparison in this repo made with a stable instrument:
+
+| | Filter on | Filter off |
+| --- | --- | --- |
+| Faithfulness | 9 below, mean 0.676 | 10 below, mean 0.658 |
+| Contextual Precision | 0 below, mean 0.995 | 0 below, mean 0.995 |
+| Contextual Relevancy | 4 below, mean 0.757 | 3 below, mean 0.752 |
+
+The effect is small and narrow: **14 of 18 cases score identically either way**. Of the four that move, `notice-01` gains 0.17 with the filter on and the rest shift by 0.05 or less. Both means improve slightly; the Relevancy *count* is one worse, entirely because `sop-01` sits on the threshold at 0.70 against 0.73.
+
+So the filter is kept on a modest measured gain in the means plus an argument that needs no judge at all: an answer about 7(a) fees should not show the SOP in its citation panel.
 
 ## Where the remaining failures come from
 
