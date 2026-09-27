@@ -135,10 +135,10 @@ run_ingestion()
 This costs a few cents in embedding calls and takes roughly a minute. Expect output close to:
 
 ```
-ingested source_doc=sop_50_10_8_1.docx        text_chars=900119  chunks=522
-ingested source_doc=cfr_121_affiliation.html  text_chars=300589  chunks=163
-ingested source_doc=notice_7a_fees_fy2026.pdf text_chars=8846    chunks=6
-ingestion complete: sources=3 total_chunks=691
+ingested source_doc=sop_50_10_8_1.docx        text_chars=900119  chunks=571
+ingested source_doc=cfr_121_affiliation.html  text_chars=300589  chunks=177
+ingested source_doc=notice_7a_fees_fy2026.pdf text_chars=8846    chunks=12
+ingestion complete: sources=3 total_chunks=760
 ```
 
 Ingestion fails loudly if a source extracts far less text than expected, rather than silently indexing a bot-check page. The vector store lands in `chroma_db/` (gitignored — it is a build artifact, not source).
@@ -213,7 +213,7 @@ pytest eval/        # golden set evaluation — needs AWS credentials, ~7 minute
 
 ## Evaluation
 
-`eval/golden_qa.json` holds 22 hand-written cases with reference answers and the source document each should cite. The suite deliberately splits into two tiers:
+`eval/golden_qa.json` holds 22 hand-written cases with reference answers and the source document each should cite. [docs/evaluation.md](docs/evaluation.md) explains what each metric measures and how it is calculated; the short version is that the suite splits into two tiers:
 
 **Hard gates — these fail the build.** Both assert on deterministic pipeline state, not model judgment:
 - an answerable question must produce `grounded=True`
@@ -226,24 +226,13 @@ They are non-blocking on purpose. During development the judge was measurably th
 
 A `NonAdvice` metric was tried and removed: in a regulatory-explainer domain it scored 0.0 on accurate restatements of SBA policy, which is exactly what the system is supposed to produce.
 
-**What the tracked metrics currently say.** Two changes were measured against the 18 answerable cases — provision-aware chunking, then an adaptive relevance floor on retrieval. Cases below the 0.7 threshold, with the mean in brackets:
+**What the tracked metrics currently say.** Two retrieval changes were measured against the 18 answerable cases — provision-aware chunking, then an adaptive relevance floor:
 
-| Configuration | Faithfulness | Contextual Precision | Contextual Relevancy |
-| --- | --- | --- | --- |
-| Uniform 800-token chunks, fixed `TOP_K = 5` | 14 | 1 | 11 |
-| Provision-aware chunks | 9–10 (0.66–0.69) | 0 (0.97–0.98) | 10 (0.64–0.65) |
-| …plus adaptive relevance floor | **6–10** (0.70–0.78) | **0** (0.96–1.00) | **3–7** (0.71–0.76) |
+![Evaluation results](docs/diagrams/eval-results.png)
 
-**Read the ranges, not the single numbers.** Running the suite against identical code and an identical index gives a spread of roughly ±2 cases, and across six runs Contextual Relevancy landed on 3, 4, 6, 6, 6 and 7 — so treat ±3 as the honest band. The judge is itself a sampled LLM. Anything inside that spread is not a result.
+Read the ranges, not the single numbers. Re-running the suite against identical code and an identical index moves the counts by about ±3, because the judge is itself a sampled LLM. Contextual Relevancy landed on 3, 4, 6, 6, 6 and 7 across runs of the same build.
 
-On that basis:
-
-- **Contextual Relevancy improved, and the floor is what did it** — 10–11 cases below threshold down to 3–7, a change clear of the spread even at its worst. Chunking alone had left it flat; see the note on `TOP_K` below for why.
-- **Not everything worked.** Splitting wrapped headings in the PDF was expected to lift the fee-notice cases and did not: the target case moved 0.37 to 0.30, inside the spread either way. It is kept because it fixes a defect that does not need a judge to see — the short-term fee rule was filed under "for loans with a maturity that exceeds 12 months", so a citation shown to the user contradicted the text beneath it. The relevancy those cases lose turns out to come from somewhere else entirely, recorded under known limitations.
-- **Contextual Precision is effectively solved**, mean 0.98–1.00.
-- **Faithfulness is ambiguous.** The mean rose consistently (0.66 → 0.71) but the case count swung 6 to 9 between runs of the same code, so the honest reading is a modest improvement, not the halving the best run suggests.
-
-Chunking did not move Relevancy because that metric measures the *proportion* of retrieved statements bearing on the question, and retrieval was returning a fixed `TOP_K = 5` regardless of how many chunks helped. Smaller chunks make each one more focused without changing the ratio. Scoring the floor relative to the best chunk in each result set does change it — see `RELEVANCE_RATIO` in `pipeline/retrieve.py`.
+Contextual Relevancy improved by more than that spread and Contextual Precision is effectively solved; Faithfulness rose in the mean but its case count swings too widely to call. [docs/evaluation.md](docs/evaluation.md) explains what each metric measures, how it is computed, which changes worked, and which did not.
 
 ## CI
 
@@ -264,6 +253,7 @@ Note that CI rebuilds the index from scratch on every run and makes real Bedrock
 - **A flat rerank curve defeats the relevance floor.** When every candidate scores within a few percent of the best, nothing is trimmed and the context stays padded. Two fee-notice cases sit below the Relevancy threshold for this reason.
 - **The grounding gate threshold is not empirically calibrated.** `0.2` is a conservative starting value chosen from observed rerank score distributions, not tuned against labelled data.
 - **PDF heading detection is heuristic.** A PDF carries no structural markup, so headings are inferred from line length, capitalisation, a trailing colon, and a `Heading: body` split for lines that wrap. The rules are fitted to this notice; a differently formatted one may need them revisited.
-- **Retrieval mixes documents on fee questions.** Asked about a 7(a) fee, retrieval returns the right fee-notice chunk plus two or three SOP chunks that also discuss fees and score within 85% of it. They are on-topic enough to clear the relative floor and unrelated enough that the judge counts them against relevancy. This is what holds the remaining Contextual Relevancy cases down; a per-source cap, or scoping retrieval by `program` metadata, is the untried lever.
+- **The reranker confuses neighbouring loan programmes.** Asked about a short-term 7(a) loan, it ranks "Upfront Fee for 7(a) WCP Loans" above the rule that answers the question: both chunks discuss 7(a) loans, maturity bands and a 0.25% rate. This is the cause of the remaining Contextual Relevancy failures, and no filtering rule reaches it — filtering removes chunks, it cannot reorder them, and here the problem is the top-ranked one. A stronger reranker or query rewriting that names the programme is the untried lever.
+- **The golden set is too small to resolve small changes.** 22 cases judged by a sampled LLM cannot distinguish a two- or three-case difference from noise, which is the honest limit on every measurement in this repo. More cases would buy more than more tuning.
 - **The BM25 index is per-process and in-memory.** It rebuilds on first use after ingestion invalidates it, which does not survive horizontal scaling.
 - **Corpus URLs are pinned to specific document revisions.** When the SBA publishes a new SOP, `ingestion/manifest.py` needs updating.

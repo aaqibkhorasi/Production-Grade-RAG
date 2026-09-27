@@ -1,0 +1,113 @@
+<mxfile host="app.diagrams.net" type="device">
+  <diagram name="Evaluation Results">
+    <mxGraphModel dx="1400" dy="900" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="760" math="0" shadow="0">
+  <root>
+    <mxCell id="0" />
+    <mxCell id="1" parent="0" />
+    <mxCell id="title" value="Did the retrieval changes actually work?" style="text;html=1;fontSize=26;fontStyle=1;fontColor=#1A365D;align=left;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="40" y="22" width="900" height="36" as="geometry" />
+    </mxCell>
+    <mxCell id="subtitle" value="Golden set, 18 answerable cases. Lower is better. Position on the axis = how many cases scored below the 0.7 threshold." style="text;html=1;fontSize=13;fontColor=#4A5568;align=left;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="40" y="60" width="1100" height="22" as="geometry" />
+    </mxCell>
+    <mxCell id="lgBefore" value="" style="ellipse;html=1;fillColor=#F8CECC;strokeColor=#B85450;strokeWidth=2;" vertex="1" parent="1">
+      <mxGeometry x="42" y="106" width="18" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="lgBeforeT" value="before (uniform 800-token chunks, fixed TOP_K)" style="text;html=1;fontSize=12;fontColor=#4A5568;align=left;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="68" y="106" width="320" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="lgAfter" value="" style="rounded=1;arcSize=40;html=1;fillColor=#D5E8D4;strokeColor=#82B366;strokeWidth=2;" vertex="1" parent="1">
+      <mxGeometry x="400" y="106" width="52" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="lgAfterT" value="after — bar spans the range seen across repeat runs of identical code" style="text;html=1;fontSize=12;fontColor=#4A5568;align=left;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="460" y="106" width="470" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="axis" value="" style="endArrow=none;html=1;strokeColor=#A0AEC0;strokeWidth=2;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="320" y="534" as="sourcePoint" />
+        <mxPoint x="1220" y="534" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="t0" value="0" style="text;html=1;fontSize=11;fontColor=#718096;align=center;" vertex="1" parent="1"><mxGeometry x="300" y="540" width="40" height="18" as="geometry" /></mxCell>
+    <mxCell id="t3" value="3" style="text;html=1;fontSize=11;fontColor=#718096;align=center;" vertex="1" parent="1"><mxGeometry x="450" y="540" width="40" height="18" as="geometry" /></mxCell>
+    <mxCell id="t6" value="6" style="text;html=1;fontSize=11;fontColor=#718096;align=center;" vertex="1" parent="1"><mxGeometry x="600" y="540" width="40" height="18" as="geometry" /></mxCell>
+    <mxCell id="t9" value="9" style="text;html=1;fontSize=11;fontColor=#718096;align=center;" vertex="1" parent="1"><mxGeometry x="750" y="540" width="40" height="18" as="geometry" /></mxCell>
+    <mxCell id="t12" value="12" style="text;html=1;fontSize=11;fontColor=#718096;align=center;" vertex="1" parent="1"><mxGeometry x="900" y="540" width="40" height="18" as="geometry" /></mxCell>
+    <mxCell id="t15" value="15" style="text;html=1;fontSize=11;fontColor=#718096;align=center;" vertex="1" parent="1"><mxGeometry x="1050" y="540" width="40" height="18" as="geometry" /></mxCell>
+    <mxCell id="t18" value="18" style="text;html=1;fontSize=11;fontColor=#718096;align=center;" vertex="1" parent="1"><mxGeometry x="1200" y="540" width="40" height="18" as="geometry" /></mxCell>
+    <mxCell id="axisCap" value="cases scoring below the 0.7 threshold" style="text;html=1;fontSize=12;fontStyle=2;fontColor=#718096;align=center;" vertex="1" parent="1">
+      <mxGeometry x="620" y="562" width="300" height="20" as="geometry" />
+    </mxCell>
+    <mxCell id="fLabel" value="Faithfulness" style="text;html=1;fontSize=15;fontStyle=1;fontColor=#2D3748;align=right;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="40" y="234" width="250" height="32" as="geometry" />
+    </mxCell>
+    <mxCell id="fRange" value="6–11" style="rounded=1;arcSize=40;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#7F6000;" vertex="1" parent="1">
+      <mxGeometry x="612" y="238" width="266" height="24" as="geometry" />
+    </mxCell>
+    <mxCell id="fBase" value="" style="ellipse;html=1;fillColor=#F8CECC;strokeColor=#B85450;strokeWidth=2;" vertex="1" parent="1">
+      <mxGeometry x="1011" y="241" width="18" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="fBaseT" value="14" style="text;html=1;fontSize=13;fontStyle=1;fontColor=#B85450;align=center;" vertex="1" parent="1">
+      <mxGeometry x="1000" y="214" width="40" height="20" as="geometry" />
+    </mxCell>
+    <mxCell id="fArrow" value="" style="endArrow=block;endFill=1;html=1;strokeColor=#A0AEC0;strokeWidth=2;dashed=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="1005" y="250" as="sourcePoint" />
+        <mxPoint x="886" y="250" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="fVerdict" value="mean rose 0.66 → 0.72, but the range is wider than the noise bar — modest, not proven" style="text;html=1;fontSize=12;fontColor=#7F6000;align=left;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="612" y="268" width="620" height="20" as="geometry" />
+    </mxCell>
+    <mxCell id="pLabel" value="Contextual Precision" style="text;html=1;fontSize=15;fontStyle=1;fontColor=#2D3748;align=right;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="40" y="334" width="250" height="32" as="geometry" />
+    </mxCell>
+    <mxCell id="pRange" value="0" style="rounded=1;arcSize=40;html=1;fillColor=#D5E8D4;strokeColor=#82B366;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#2F5E1E;" vertex="1" parent="1">
+      <mxGeometry x="303" y="338" width="34" height="24" as="geometry" />
+    </mxCell>
+    <mxCell id="pBase" value="" style="ellipse;html=1;fillColor=#F8CECC;strokeColor=#B85450;strokeWidth=2;" vertex="1" parent="1">
+      <mxGeometry x="361" y="341" width="18" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="pBaseT" value="1" style="text;html=1;fontSize=13;fontStyle=1;fontColor=#B85450;align=center;" vertex="1" parent="1">
+      <mxGeometry x="350" y="314" width="40" height="20" as="geometry" />
+    </mxCell>
+    <mxCell id="pVerdict" value="solved — every case clears the threshold, mean 0.98–1.00: the reranker reliably puts the right chunk first" style="text;html=1;fontSize=12;fontColor=#2F5E1E;align=left;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="400" y="368" width="740" height="20" as="geometry" />
+    </mxCell>
+    <mxCell id="rLabel" value="Contextual Relevancy" style="text;html=1;fontSize=15;fontStyle=1;fontColor=#2D3748;align=right;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="40" y="434" width="250" height="32" as="geometry" />
+    </mxCell>
+    <mxCell id="rRange" value="3–7" style="rounded=1;arcSize=40;html=1;fillColor=#D5E8D4;strokeColor=#82B366;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#2F5E1E;" vertex="1" parent="1">
+      <mxGeometry x="462" y="438" width="216" height="24" as="geometry" />
+    </mxCell>
+    <mxCell id="rBase" value="" style="ellipse;html=1;fillColor=#F8CECC;strokeColor=#B85450;strokeWidth=2;" vertex="1" parent="1">
+      <mxGeometry x="861" y="441" width="18" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="rBaseT" value="11" style="text;html=1;fontSize=13;fontStyle=1;fontColor=#B85450;align=center;" vertex="1" parent="1">
+      <mxGeometry x="850" y="414" width="40" height="20" as="geometry" />
+    </mxCell>
+    <mxCell id="rArrow" value="" style="endArrow=block;endFill=1;html=1;strokeColor=#82B366;strokeWidth=3;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="855" y="450" as="sourcePoint" />
+        <mxPoint x="686" y="450" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="rVerdict" value="real — the whole range sits clear of where noise alone could put it. The adaptive relevance floor did this, not chunking." style="text;html=1;fontSize=12;fontColor=#2F5E1E;align=left;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="462" y="468" width="760" height="20" as="geometry" />
+    </mxCell>
+    <mxCell id="noiseBox" value="" style="rounded=1;arcSize=20;html=1;fillColor=#F7FAFC;strokeColor=#CBD5E0;dashed=1;" vertex="1" parent="1">
+      <mxGeometry x="300" y="604" width="940" height="76" as="geometry" />
+    </mxCell>
+    <mxCell id="noiseBar" value="" style="rounded=0;html=1;fillColor=#E2E8F0;strokeColor=#A0AEC0;strokeWidth=2;" vertex="1" parent="1">
+      <mxGeometry x="320" y="628" width="150" height="20" as="geometry" />
+    </mxCell>
+    <mxCell id="noiseT" value="This is what ±3 cases looks like on the same scale — the judge's own run-to-run spread." style="text;html=1;fontSize=12;fontStyle=1;fontColor=#2D3748;align=left;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="486" y="626" width="740" height="22" as="geometry" />
+    </mxCell>
+    <mxCell id="noiseT2" value="Re-running the suite on identical code gave Relevancy 3, 4, 6, 6, 6 and 7. Any movement shorter than this bar is not a result." style="text;html=1;fontSize=12;fontColor=#718096;align=left;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="320" y="654" width="900" height="20" as="geometry" />
+    </mxCell>
+  </root>
+</mxGraphModel>
+  </diagram>
+</mxfile>
