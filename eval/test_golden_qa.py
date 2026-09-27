@@ -88,6 +88,12 @@ def judge_model():
             or "us.anthropic.claude-haiku-4-5-20251001-v1:0"
         ),
         region=os.getenv("AWS_REGION") or "us-east-1",
+        # DeepEval sends inferenceConfig={**generation_kwargs} and defaults that
+        # to {}, so with nothing passed Bedrock applies the model's own default
+        # temperature of 1.0 and every verdict is a fresh sample. The pipeline
+        # being measured runs at temperature 0; the judge measuring it should
+        # too, or its sampling noise is attributed to the code under test.
+        generation_kwargs={"temperature": 0},
     )
 
 

@@ -132,3 +132,31 @@ Asked *"what is the upfront fee for a short-term 7(a) loan with a maturity of 12
 No filtering rule fixes this. Filtering removes chunks; it cannot reorder them, and here the problematic chunk is the top-ranked one. The remaining levers are a stronger reranker, query rewriting that names the programme explicitly, or simply more golden cases so that a change of this size is measurable at all.
 
 That last point is the honest constraint on everything above: **22 cases judged by a sampled LLM cannot resolve differences of two or three cases.** Further tuning against this set would be fitting to noise.
+
+## The judge was not running deterministically
+
+Everything above about run-to-run spread was measured before noticing this: DeepEval builds its Bedrock request as
+
+```python
+"inferenceConfig": {**self.generation_kwargs}      # defaults to {}
+```
+
+With nothing passed, Bedrock applies the model's own default temperature and every verdict is a fresh sample. The pipeline being measured runs at `temperature=0`; the judge measuring it did not, so its sampling noise was being attributed to the code under test.
+
+Pinning the judge to `temperature=0` changes the picture:
+
+| | Run A | Run B |
+| --- | --- | --- |
+| Faithfulness | 9 below, mean 0.676 | 9 below, mean 0.676 |
+| Contextual Precision | 0 below, mean 0.995 | 0 below, mean 0.995 |
+| Contextual Relevancy | 4 below, mean 0.757 | 3 below, mean 0.759 |
+
+Two consecutive runs, identical code and index: **17 of 18 cases scored identically**. The single case that moved, `sop-01`, went 0.70 to 0.73 and changed the count only because it sits exactly on the threshold.
+
+So most of the instability documented earlier was configuration, not an inherent property of LLM-as-judge evaluation. Three caveats remain:
+
+- **Determinism is not guaranteed even at temperature 0.** Greedy decoding still shifts with batching and hardware, and Bedrock makes no bitwise promise.
+- **A threshold turns any residual wobble into a step change.** A case at 0.699 and one at 0.701 are the same answer and a different count. Means are steadier than counts for this reason.
+- **Two runs is a small sample.** It is enough to show the spread collapsed, not enough to put a number on what remains.
+
+The practical consequence is that changes previously dismissed as "inside the noise" — cross-source filtering in particular — are now worth re-measuring, because the instrument they were measured with was miscalibrated.
