@@ -13,7 +13,7 @@ def test_retrieve_unions_vector_and_bm25_candidates_then_reranks():
             {"source_doc": "a.docx", "effective_date": "2026-01-01", "program": "core"},
             {"source_doc": "a.docx", "effective_date": "2026-01-01", "program": "core"},
             {"source_doc": "b.html", "effective_date": "2026-02-01", "program": "affiliation"},
-            {"source_doc": "c.pdf", "effective_date": "2026-03-01", "program": "7(a)"},
+            {"source_doc": "b.html", "effective_date": "2026-02-01", "program": "affiliation"},
         ],
     }
     fake_embedder = Mock()
@@ -36,9 +36,10 @@ def test_retrieve_unions_vector_and_bm25_candidates_then_reranks():
         result = retrieve({"question": "what is affiliation"}, collection=fake_collection)
 
     assert result["question"] == "what is affiliation"
-    assert len(result["retrieved_chunks"]) == 2
-    assert result["retrieved_chunks"][0]["source_doc"] == "b.html"
-    assert result["retrieved_chunks"][1]["source_doc"] == "c.pdf"
+    # "b1" reached the output despite only BM25 surfacing it, which is what the
+    # union exists for. Both come from one source so cross-source filtering,
+    # which has its own tests, does not interfere.
+    assert [c["chunk_text"] for c in result["retrieved_chunks"]] == ["shared doc", "bm25 doc"]
     assert result["top_rerank_score"] == 0.9
 
     fetch_ids = fake_collection.get.call_args.kwargs["ids"]
@@ -215,3 +216,58 @@ def test_retrieve_still_applies_the_absolute_floor_when_every_candidate_is_weak(
         result = retrieve({"question": "what is the capital of France"}, collection=fake_collection)
 
     assert result["retrieved_chunks"] == []
+
+
+def _collection_with(documents, sources):
+    collection = Mock()
+    ids = [f"c{i}" for i in range(len(documents))]
+    collection.query.return_value = {"ids": [ids]}
+    collection.get.return_value = {
+        "ids": ids,
+        "documents": documents,
+        "metadatas": [
+            {"source_doc": s, "effective_date": "2026-01-01", "program": "core"} for s in sources
+        ],
+    }
+    return collection, ids
+
+
+def _retrieve_with(collection, ids, scores, question="what is the upfront fee"):
+    def fake_rerank(_question, candidates, top_k, client=None):
+        by_id = {c["chunk_id"]: c for c in candidates}
+        return [{**by_id[i], "score": s} for i, s in zip(ids, scores)][:top_k]
+
+    fake_embedder = Mock()
+    fake_embedder.embed_query.return_value = [0.1, 0.2]
+    with (
+        patch("pipeline.retrieve.get_embedding_model", return_value=fake_embedder),
+        patch("pipeline.retrieve.rank_by_bm25", return_value=[]),
+        patch("pipeline.retrieve.rerank", side_effect=fake_rerank),
+    ):
+        return retrieve({"question": question}, collection=collection)
+
+
+def test_retrieve_drops_other_sources_that_merely_clear_the_relevance_floor():
+    # Asked about a 7(a) fee, retrieval returned the right fee-notice chunk plus
+    # SOP sections that also discuss fees -- close enough to survive the floor,
+    # unrelated enough to dilute the context.
+    collection, ids = _collection_with(
+        ["fee tiers", "fee timing", "sop fees A", "sop fees B"],
+        ["notice.pdf", "notice.pdf", "sop.docx", "sop.docx"],
+    )
+
+    result = _retrieve_with(collection, ids, [0.93, 0.90, 0.86, 0.80])
+
+    assert [c["source_doc"] for c in result["retrieved_chunks"]] == ["notice.pdf", "notice.pdf"]
+
+
+def test_retrieve_keeps_a_second_source_that_ties_with_the_best_chunk():
+    # When the reranker cannot separate two documents, the question may genuinely
+    # span both, so the tie window keeps them.
+    collection, ids = _collection_with(
+        ["cfr affiliation", "sop affiliation"], ["cfr.html", "sop.docx"]
+    )
+
+    result = _retrieve_with(collection, ids, [0.90, 0.895], question="what is affiliation")
+
+    assert [c["source_doc"] for c in result["retrieved_chunks"]] == ["cfr.html", "sop.docx"]

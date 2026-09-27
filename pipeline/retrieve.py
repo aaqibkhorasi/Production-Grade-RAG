@@ -26,6 +26,21 @@ CANDIDATE_K = 15  # pool size per retrieval method, before reranking narrows to 
 # for all 18, which is the citation hard gate.
 RELEVANCE_RATIO = 0.85
 
+# Admit a second source document only when it scores within this fraction of the
+# best chunk.
+#
+# A question is normally answered by one document, and the others contribute
+# padding: asked about a 7(a) fee, retrieval returned the right fee-notice chunk
+# plus three SOP sections that also discuss fees, close enough in score to clear
+# the relevance floor and unrelated enough to dilute the context. Measured over
+# the golden set this only touches cases that genuinely mix -- the SOP and CFR
+# questions already return a single source -- and the expected source document
+# still comes back for all 18.
+#
+# The tie window keeps a genuinely cross-document question working: when the
+# reranker cannot separate two sources, both are kept.
+CROSS_SOURCE_TIE_RATIO = 0.98
+
 logger = logging.getLogger(__name__)
 
 
@@ -81,6 +96,14 @@ def retrieve(state: QueryState, collection=None) -> QueryState:
         # set, since they always score 100% of the top score.
         relevance_floor = max(GROUNDING_GATE_THRESHOLD, top_rerank_score * RELEVANCE_RATIO)
         top_candidates = [c for c in reranked if c["score"] >= relevance_floor]
+        if top_candidates:
+            primary_source = top_candidates[0]["metadata"]["source_doc"]
+            tie_floor = top_rerank_score * CROSS_SOURCE_TIE_RATIO
+            top_candidates = [
+                c
+                for c in top_candidates
+                if c["metadata"]["source_doc"] == primary_source or c["score"] >= tie_floor
+            ]
         retrieved = [
             Citation(
                 source_doc=c["metadata"]["source_doc"],
